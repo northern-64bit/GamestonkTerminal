@@ -1,13 +1,11 @@
 # IMPORTATION THIRDPARTY
 import logging
 from argparse import Namespace
-from pathlib import Path
 
 # IMPORTATION THIRDPARTY
 import pandas as pd
 from degiro_connector.core.helpers import pb_handler
 from degiro_connector.trading.models.trading_pb2 import (
-    Credentials,
     LatestNews,
     NewsByCompany,
     Order,
@@ -21,7 +19,6 @@ from openbb_terminal.decorators import check_api_key
 
 # IMPORTATION INTERNAL
 from openbb_terminal.helper_funcs import (
-    export_data,
     print_rich_table,
 )
 from openbb_terminal.portfolio.brokers.degiro.degiro_model import DegiroModel
@@ -312,13 +309,14 @@ class DegiroView:
 
     @log_start_end(log=logger)
     @check_api_key(["DG_USERNAME", "DG_PASSWORD"])
-    def login(self):
+    def login(self, otp: int = None):
         # GET ATTRIBUTES
         degiro_model = self.__degiro_model
-        default_credentials = degiro_model.login_default_credentials()
+        credentials = degiro_model.login_default_credentials()
 
-        credentials = Credentials()
-        credentials.CopyFrom(default_credentials)
+        if otp is not None:
+            credentials.one_time_password = otp
+
         degiro_model.login()
 
         DegiroView.__login_display_success()
@@ -507,17 +505,15 @@ class DegiroView:
         )
 
         if portfolio_df is not None:
+
             print_rich_table(
                 df=portfolio_df,
                 headers=list(portfolio_df.columns),
                 show_index=True,
                 title="Degiro Transactions",
             )
-            export_data(
-                export_type=ns_parser.export,
-                dir_path=str(Path(__file__).parent.parent.parent.absolute()),
-                func_name="paexport",
-                df=portfolio_df,
-            )
+
+            degiro_model.export_data(portfolio_df, ns_parser.export)
+
         else:
             console.print("Error while fetching or processing Transactions.")

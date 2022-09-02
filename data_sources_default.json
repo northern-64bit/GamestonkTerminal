@@ -1,10 +1,15 @@
 {
     "stocks": {
+        "news": [
+            "feedparser",
+            "newsapi"
+        ],
         "load": [
             "yf",
             "iex",
             "av",
-            "polygon"
+            "polygon",
+            "eodhd"
         ],
         "dps": {
             "psi": [
@@ -16,33 +21,53 @@
             "income": [
                 "yf",
                 "polygon",
-                "av"
+                "av",
+                "fmp"
             ],
             "balance": [
                 "yf",
                 "polygon",
-                "av"
+                "av",
+                "fmp"
+            ],
+            "cash": [
+                "yf",
+                "polygon",
+                "av",
+                "fmp"
             ]
         },
         "options": {
             "load": [
+                "yf",
                 "tradier",
-                "yf"
+                "nasdaq"
             ],
             "hist": [
                 "chartexchange",
                 "tradier"
             ],
             "vol": [
+                "yf",
                 "tradier",
-                "yf"
+                "nasdaq"
             ],
             "voi": [
+                "yf",
                 "tradier",
-                "yf"
+                "nasdaq"
             ],
             "oi": [
+                "yf",
                 "tradier",
+                "nasdaq"
+            ],
+            "chains": [
+                "yf",
+                "tradier",
+                "nasdaq"
+            ],
+            "greeks": [
                 "yf"
             ]
         },
@@ -52,6 +77,10 @@
                 "av",
                 "iex",
                 "polygon"
+            ],
+            "hotpenny": [
+                "yf",
+                "psf"
             ]
         },
         "sia": {
@@ -180,6 +209,10 @@
             "yf",
             "av",
             "polygon"
+        ],
+        "quote": [
+            "yf",
+            "av"
         ]
     }
 }
