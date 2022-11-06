@@ -2,115 +2,141 @@
 import os
 import os.path
 from distutils.util import strtobool
-import pkg_resources
 
 # IMPORTATION THIRDPARTY
 from dotenv import load_dotenv
+import pkg_resources
 import i18n
 
 # IMPORTATION INTERNAL
-from openbb_terminal.core.config.constants import ENV_FILE
-
-# pylint: disable=no-member
-
-i18n_dict_location = (
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "i18n")
-    if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "i18n"))
-    else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "i18n")
+from openbb_terminal.core.config.paths import (
+    MISCELLANEOUS_DIRECTORY,
+    PACKAGE_ENV_FILE,
+    REPOSITORY_ENV_FILE,
+    USER_DATA_SOURCES_DEFAULT_FILE,
+    USER_ENV_FILE,
 )
-i18n.load_path.append(i18n_dict_location)
-i18n.set("locale", "en")
-i18n.set("filename_format", "{locale}.{format}")
+from openbb_terminal.core.config import paths_helper
+from openbb_terminal import base_helpers
 
-if ENV_FILE.is_file():
-    load_dotenv(dotenv_path=ENV_FILE, override=True)
+paths_helper.init_userdata()
+
+# pylint: disable=no-member,c-extension-no-member
+
+load_dotenv(USER_ENV_FILE)
+load_dotenv(REPOSITORY_ENV_FILE, override=True)
+load_dotenv(PACKAGE_ENV_FILE, override=True)
 
 # Retry unknown commands with `load`
-RETRY_WITH_LOAD = strtobool(os.getenv("OPENBB_RETRY_WITH_LOAD", "False"))
+RETRY_WITH_LOAD = base_helpers.load_env_vars(
+    "OPENBB_RETRY_WITH_LOAD", strtobool, False, "featflags"
+)
 
 # Use tabulate to print dataframes
-USE_TABULATE_DF = strtobool(os.getenv("OPENBB_USE_TABULATE_DF", "True"))
+USE_TABULATE_DF = base_helpers.load_env_vars(
+    "OPENBB_USE_TABULATE_DF", strtobool, True, "featflags"
+)
 
 # Use clear console after each command
-USE_CLEAR_AFTER_CMD = strtobool(os.getenv("OPENBB_USE_CLEAR_AFTER_CMD", "False"))
+USE_CLEAR_AFTER_CMD = base_helpers.load_env_vars(
+    "OPENBB_USE_CLEAR_AFTER_CMD", strtobool, False, "featflags"
+)
 
 # Use coloring features
-USE_COLOR = strtobool(os.getenv("OPENBB_USE_COLOR", "True"))
+USE_COLOR = base_helpers.load_env_vars("OPENBB_USE_COLOR", strtobool, True, "featflags")
 
 # Select console flair (choose from config_terminal.py list)
 USE_FLAIR = str(os.getenv("OPENBB_USE_FLAIR", ":openbb"))
 
 # Add date and time to command line
-USE_DATETIME = strtobool(os.getenv("OPENBB_USE_DATETIME", "True"))
+USE_DATETIME = base_helpers.load_env_vars(
+    "OPENBB_USE_DATETIME", strtobool, True, "featflags"
+)
 
 # Enable interactive matplotlib mode
-USE_ION = strtobool(os.getenv("OPENBB_USE_ION", "True"))
+USE_ION = base_helpers.load_env_vars("OPENBB_USE_ION", strtobool, True, "featflags")
 
 # Enable watermark in the figures
-USE_WATERMARK = strtobool(os.getenv("OPENBB_USE_WATERMARK", "True"))
+USE_WATERMARK = base_helpers.load_env_vars(
+    "OPENBB_USE_WATERMARK", strtobool, True, "featflags"
+)
 
 # Enable command and source in the figures
-USE_CMD_LOCATION_FIGURE = strtobool(os.getenv("OPENBB_USE_CMD_LOCATION_FIGURE", "True"))
+USE_CMD_LOCATION_FIGURE = base_helpers.load_env_vars(
+    "OPENBB_USE_CMD_LOCATION_FIGURE", strtobool, True, "featflags"
+)
 
 # Enable Prompt Toolkit
-USE_PROMPT_TOOLKIT = strtobool(os.getenv("OPENBB_USE_PROMPT_TOOLKIT", "True"))
-
-# Enable Prediction features
-ENABLE_PREDICT = strtobool(os.getenv("OPENBB_ENABLE_PREDICT", "True"))
+USE_PROMPT_TOOLKIT = base_helpers.load_env_vars(
+    "OPENBB_USE_PROMPT_TOOLKIT", strtobool, True, "featflags"
+)
 
 # Enable plot autoscaling
-USE_PLOT_AUTOSCALING = strtobool(os.getenv("OPENBB_USE_PLOT_AUTOSCALING", "False"))
+USE_PLOT_AUTOSCALING = base_helpers.load_env_vars(
+    "OPENBB_USE_PLOT_AUTOSCALING", strtobool, False, "featflags"
+)
 
 # Enable thoughts of the day
-ENABLE_THOUGHTS_DAY = strtobool(os.getenv("OPENBB_ENABLE_THOUGHTS_DAY", "False"))
+ENABLE_THOUGHTS_DAY = base_helpers.load_env_vars(
+    "OPENBB_ENABLE_THOUGHTS_DAY", strtobool, False, "featflags"
+)
 
 # Quick exit for testing
-ENABLE_QUICK_EXIT = strtobool(os.getenv("OPENBB_ENABLE_QUICK_EXIT", "False"))
+ENABLE_QUICK_EXIT = base_helpers.load_env_vars(
+    "OPENBB_ENABLE_QUICK_EXIT", strtobool, False, "featflags"
+)
 
 # Open report as HTML, otherwise notebook
-OPEN_REPORT_AS_HTML = strtobool(os.getenv("OPENBB_OPEN_REPORT_AS_HTML", "True"))
+OPEN_REPORT_AS_HTML = base_helpers.load_env_vars(
+    "OPENBB_OPEN_REPORT_AS_HTML", strtobool, True, "featflags"
+)
 
 # Enable auto print_help when exiting menus
-ENABLE_EXIT_AUTO_HELP = strtobool(os.getenv("OPENBB_ENABLE_EXIT_AUTO_HELP", "True"))
+ENABLE_EXIT_AUTO_HELP = base_helpers.load_env_vars(
+    "OPENBB_ENABLE_EXIT_AUTO_HELP", strtobool, True, "featflags"
+)
 
 # Remember contexts during session
-REMEMBER_CONTEXTS = strtobool(os.getenv("OPENBB_REMEMBER_CONTEXTS", "True"))
+REMEMBER_CONTEXTS = base_helpers.load_env_vars(
+    "OPENBB_REMEMBER_CONTEXTS", strtobool, True, "featflags"
+)
 
 # Use the colorful rich terminal
-ENABLE_RICH = strtobool(os.getenv("OPENBB_ENABLE_RICH", "True"))
+ENABLE_RICH = base_helpers.load_env_vars(
+    "OPENBB_ENABLE_RICH", strtobool, True, "featflags"
+)
 
 # Use the colorful rich terminal
-ENABLE_RICH_PANEL = strtobool(os.getenv("OPENBB_ENABLE_RICH_PANEL", "True"))
+ENABLE_RICH_PANEL = base_helpers.load_env_vars(
+    "OPENBB_ENABLE_RICH_PANEL", strtobool, True, "featflags"
+)
 
 # Check API KEYS before running a command
-ENABLE_CHECK_API = strtobool(os.getenv("OPENBB_ENABLE_CHECK_API", "True"))
+ENABLE_CHECK_API = base_helpers.load_env_vars(
+    "OPENBB_ENABLE_CHECK_API", strtobool, True, "featflags"
+)
 
 # Send logs to data lake
-LOG_COLLECTION = bool(strtobool(os.getenv("OPENBB_LOG_COLLECTION", "True")))
+LOG_COLLECTION = base_helpers.load_env_vars(
+    "OPENBB_LOG_COLLECT", strtobool, True, "featflags"
+)
 
 # Provide export folder path. If empty that means default.
 EXPORT_FOLDER_PATH = str(os.getenv("OPENBB_EXPORT_FOLDER_PATH", ""))
 
-# Set a flag if the application is running from a packaged bundle
-PACKAGED_APPLICATION = strtobool(os.getenv("OPENBB_PACKAGED_APPLICATION", "False"))
-
 # Toolbar hint
-TOOLBAR_HINT = strtobool(os.getenv("OPENBB_TOOLBAR_HINT", "True"))
+TOOLBAR_HINT = base_helpers.load_env_vars(
+    "OPENBB_TOOLBAR_HINT", strtobool, True, "featflags"
+)
 
 # Select language to be used
 USE_LANGUAGE = str(os.getenv("OPENBB_USE_LANGUAGE", "en"))
-
-LOGGING_COMMIT_HASH = str(os.getenv("OPENBB_LOGGING_COMMIT_HASH", "REPLACE_ME"))
 
 # File that contains a JSON dictionary of preferred sources for commands
 PREFERRED_DATA_SOURCE_FILE = str(
     os.getenv(
         "OPENBB_PREFERRED_DATA_SOURCE_FILE",
-        os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..",
-            "data_sources_default.json",
-        ),
+        USER_DATA_SOURCES_DEFAULT_FILE,
     )
 )
 
@@ -125,5 +151,11 @@ GUESS_EASTER_EGG_FILE = str(
 try:
     version = pkg_resources.get_distribution("OpenBBTerminal").version
 except Exception:
-    version = "1.8.0m"
+    version = "1.9.0m"
 VERSION = str(os.getenv("OPENBB_VERSION", version))
+
+# Select the terminal translation language
+i18n_dict_location = MISCELLANEOUS_DIRECTORY / "i18n"
+i18n.load_path.append(i18n_dict_location)
+i18n.set("locale", USE_LANGUAGE)
+i18n.set("filename_format", "{locale}.{format}")

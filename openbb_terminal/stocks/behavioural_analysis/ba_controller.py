@@ -7,14 +7,14 @@ from datetime import datetime, timedelta
 from typing import List
 
 import yfinance as yf
-from prompt_toolkit.completion import NestedCompleter
+
+from openbb_terminal.custom_prompt_toolkit import NestedCompleter
 
 from openbb_terminal import feature_flags as obbff
 from openbb_terminal.common.behavioural_analysis import (
     finbrain_view,
     google_view,
     reddit_view,
-    sentimentinvestor_view,
     stocktwits_view,
     twitter_view,
 )
@@ -26,11 +26,10 @@ from openbb_terminal.helper_funcs import (
     check_int_range,
     check_positive,
     valid_date,
-    valid_hour,
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import StockBaseController
-from openbb_terminal.rich_config import console, MenuText
+from openbb_terminal.rich_config import console, MenuText, get_ordered_list_sources
 
 # pylint:disable=R0904,C0302
 
@@ -45,7 +44,7 @@ class BehaviouralAnalysisController(StockBaseController):
         "load",
         "watchlist",
         "spac",
-        "spac_c",
+        "spacc",
         "wsb",
         "popular",
         "bullbear",
@@ -54,7 +53,7 @@ class BehaviouralAnalysisController(StockBaseController):
         "stalker",
         "infer",
         "sentiment",
-        "reddit_sent",
+        "redditsent",
         "mentions",
         "regions",
         "queries",
@@ -62,17 +61,15 @@ class BehaviouralAnalysisController(StockBaseController):
         "headlines",
         "popular",
         "getdd",
-        "hist",
-        "trend",
         "snews",
-        "jcdr",
-        "jctr",
         "interest",
     ]
 
     historical_sort = ["date", "value"]
     historical_direction = ["asc", "desc"]
     historical_metric = ["sentiment", "AHI", "RHI", "SGP"]
+    reddit_sort = ["relevance", "hot", "top", "new", "comments"]
+    reddit_time = ["hour", "day", "week", "month", "year", "all"]
     PATH = "/stocks/ba/"
 
     def __init__(self, ticker: str, start: datetime, queue: List[str] = None):
@@ -84,6 +81,111 @@ class BehaviouralAnalysisController(StockBaseController):
 
         if session and obbff.USE_PROMPT_TOOLKIT:
             choices: dict = {c: {} for c in self.controller_choices}
+
+            one_to_hundred: dict = {str(c): {} for c in range(1, 100)}
+            choices["load"] = {
+                "--ticker": None,
+                "-t": "--ticker",
+                "--start": None,
+                "-s": "--start",
+                "--end": None,
+                "-e": "--end",
+                "--interval": {c: {} for c in ["1", "5", "15", "30", "60"]},
+                "-i": "--interval",
+                "--prepost": {},
+                "-p": "--prepost",
+                "--file": None,
+                "-f": "--file",
+                "--monthly": {},
+                "-m": "--monthly",
+                "--weekly": {},
+                "-w": "--weekly",
+                "--iexrange": {c: {} for c in ["ytd", "1y", "2y", "5y", "6m"]},
+                "-r": "--iexrange",
+                "--source": {
+                    c: {} for c in get_ordered_list_sources(f"{self.PATH}load")
+                },
+            }
+            choices["headlines"]["--raw"] = {}
+            choices["wsb"] = {
+                "--new": {},
+                "--limit": one_to_hundred,
+                "-l": "--limit",
+            }
+            limit = {
+                "--limit": one_to_hundred,
+                "-l": "--limit",
+            }
+            choices["watchlist"] = limit
+            choices["popular"] = {
+                "--limit": one_to_hundred,
+                "-l": "--limit",
+                "--num": one_to_hundred,
+                "-n": "--num",
+                "--sub": None,
+                "-s": "--sub",
+            }
+            choices["spacc"] = {
+                "--popular": {},
+                "-p": "--popular",
+                "--limit": one_to_hundred,
+                "-l": "--limit",
+            }
+            choices["spac"] = limit
+            choices["getdd"] = {
+                "--limit": one_to_hundred,
+                "-l": "--limit",
+                "--days": one_to_hundred,
+                "-d": "--days",
+                "--all": {},
+                "-a": "--all",
+            }
+            choices["redditsent"] = {
+                "--sort": {c: {} for c in self.reddit_sort},
+                "-s": "--sort",
+                "--company": None,
+                "-c": "--company",
+                "--subreddits": None,
+                "--time": {c: {} for c in self.reddit_time},
+                "-t": "--time",
+                "--full": {},
+                "--graphic": {},
+                "-g": "--graphic",
+                "--display": {},
+                "-d": "--display",
+                "--limit": one_to_hundred,
+                "-l": "--limit",
+            }
+            choices["stalker"] = {
+                "--user": None,
+                "-u": "--user",
+                "--limit": one_to_hundred,
+                "-l": "--limit",
+            }
+            choices["messages"] = limit
+            choices["infer"] = limit
+            choices["sentiment"] = {
+                "--limit": one_to_hundred,
+                "-l": "--limit",
+                "--days": one_to_hundred,
+                "-d": "--days",
+                "--compare": {},
+                "-c": "--compare",
+            }
+            choices["mentions"] = {
+                "--start": None,
+                "-s": "--start",
+            }
+            choices["regions"] = limit
+            choices["mentions"] = {
+                "--start": None,
+                "-s": "--start",
+                "--words": None,
+                "-w": "--words",
+            }
+            choices["queries"] = limit
+            choices["rise"] = limit
+
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def print_help(self):
@@ -98,10 +200,10 @@ class BehaviouralAnalysisController(StockBaseController):
         mt.add_cmd("wsb")
         mt.add_cmd("watchlist")
         mt.add_cmd("popular")
-        mt.add_cmd("spac_c")
+        mt.add_cmd("spacc")
         mt.add_cmd("spac")
         mt.add_cmd("getdd", self.ticker)
-        mt.add_cmd("reddit_sent", self.ticker)
+        mt.add_cmd("redditsent", self.ticker)
         mt.add_cmd("trending")
         mt.add_cmd("stalker")
         mt.add_cmd("bullbear", self.ticker)
@@ -113,10 +215,6 @@ class BehaviouralAnalysisController(StockBaseController):
         mt.add_cmd("interest", self.ticker)
         mt.add_cmd("queries", self.ticker)
         mt.add_cmd("rise", self.ticker)
-        mt.add_cmd("trend")
-        mt.add_cmd("hist", self.ticker)
-        mt.add_cmd("jcdr")
-        mt.add_cmd("jctr", self.ticker)
         console.print(text=mt.menu_text, menu="Stocks - Behavioural Analysis")
 
     def custom_reset(self):
@@ -191,12 +289,12 @@ class BehaviouralAnalysisController(StockBaseController):
             reddit_view.display_spac(limit=ns_parser.n_limit)
 
     @log_start_end(log=logger)
-    def call_spac_c(self, other_args: List[str]):
-        """Process spac_c command"""
+    def call_spacc(self, other_args: List[str]):
+        """Process spacc command"""
         parser = argparse.ArgumentParser(
             add_help=False,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            prog="spac_c",
+            prog="spacc",
             description="""Print other users SPACs announcement under subreddit 'SPACs'. [Source: Reddit]""",
         )
         parser.add_argument(
@@ -359,11 +457,11 @@ class BehaviouralAnalysisController(StockBaseController):
                 console.print("No ticker loaded. Please load using 'load <ticker>'\n")
 
     @log_start_end(log=logger)
-    def call_reddit_sent(self, other_args: List[str]):
-        """Process reddit_sent command"""
+    def call_redditsent(self, other_args: List[str]):
+        """Process redditsent command"""
         parser = argparse.ArgumentParser(
             add_help=False,
-            prog="reddit_sent",
+            prog="redditsent",
             description="""
                 Determine general Reddit sentiment about a ticker. [Source: Reddit]
             """,
@@ -373,7 +471,7 @@ class BehaviouralAnalysisController(StockBaseController):
             "--sort",
             action="store",
             dest="sort",
-            choices=["relevance", "hot", "top", "new", "comments"],
+            choices=self.reddit_sort,
             default="relevance",
             help="search sorting type",
         )
@@ -407,7 +505,7 @@ class BehaviouralAnalysisController(StockBaseController):
             action="store",
             dest="time",
             default="week",
-            choices=["hour", "day", "week", "month", "year", "all"],
+            choices=self.reddit_time,
             help="time period to get posts from -- all, year, month, week, or day; defaults to week",
         )
         parser.add_argument(
@@ -441,7 +539,7 @@ class BehaviouralAnalysisController(StockBaseController):
         if ns_parser:
             ticker = ns_parser.company if ns_parser.company else self.ticker
             if self.ticker:
-                reddit_view.display_reddit_sent(
+                reddit_view.display_redditsent(
                     symbol=ticker,
                     sortby=ns_parser.sort,
                     limit=ns_parser.limit,
@@ -569,7 +667,7 @@ class BehaviouralAnalysisController(StockBaseController):
             "--start",
             type=valid_date,
             dest="start",
-            default=self.start,
+            default=self.start if self.start != "" else "2000-01-01",
             help="starting date (format YYYY-MM-DD) from when we are interested in stock's mentions.",
         )
         if other_args and "-" not in other_args[0][0]:
@@ -858,109 +956,6 @@ class BehaviouralAnalysisController(StockBaseController):
             else:
                 console.print("No ticker loaded. Please load using 'load <ticker>'\n")
 
-    @log_start_end(log=logger)
-    def call_hist(self, other_args: List[str]):
-        """Process hist command"""
-        parser = argparse.ArgumentParser(
-            add_help=False,
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            prog="hist",
-            description="Plot historical sentiment data of RHI and AHI by hour",
-        )
-        parser.add_argument(
-            "-s",
-            "--start",
-            type=valid_date,
-            default=(datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d"),
-            dest="start",
-            required="--end" in other_args,
-            help="The starting date (format YYYY-MM-DD) of the stock. Default: 7 days ago",
-        )
-
-        parser.add_argument(
-            "-e",
-            "--end",
-            type=valid_date,
-            default=datetime.utcnow().strftime("%Y-%m-%d"),
-            dest="end",
-            required="--start" in other_args,
-            help="The ending date (format YYYY-MM-DD) of the stock. Default: today",
-        )
-        parser.add_argument(
-            "-n",
-            "--number",
-            default=100,
-            type=check_positive,
-            dest="number",
-            help="Number of results returned from Sentiment Investor. Default: 100",
-        )
-        ns_parser = self.parse_known_args_and_warn(
-            parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES, raw=True, limit=10
-        )
-
-        if ns_parser:
-            if self.ticker:
-                sentimentinvestor_view.display_historical(
-                    symbol=self.ticker,
-                    start_date=ns_parser.start,
-                    end_date=ns_parser.end,
-                    number=ns_parser.number,
-                    export=ns_parser.export,
-                    raw=ns_parser.raw,
-                    limit=ns_parser.limit,
-                )
-            else:
-                console.print("No ticker loaded. Please load using 'load <ticker>'\n")
-
-    @log_start_end(log=logger)
-    def call_trend(self, other_args: List[str]):
-        """Process trend command"""
-        parser = argparse.ArgumentParser(
-            add_help=False,
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            prog="trend",
-            description="Show most talked about tickers within the last one hour",
-        )
-        parser.add_argument(
-            "-s",
-            "--start",
-            type=valid_date,
-            default=datetime.utcnow().strftime("%Y-%m-%d"),
-            dest="start",
-            help="The starting date (format YYYY-MM-DD). Default: Today",
-        )
-
-        parser.add_argument(
-            "-hr",
-            "--hour",
-            type=valid_hour,
-            default=0,
-            dest="hour",
-            help="Hour of the day in the 24-hour notation. Example: 14",
-        )
-
-        parser.add_argument(
-            "-n",
-            "--number",
-            default=10,
-            type=check_positive,
-            dest="number",
-            help="Number of results returned from Sentiment Investor. Default: 10",
-        )
-
-        ns_parser = self.parse_known_args_and_warn(
-            parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED, limit=10
-        )
-
-        if ns_parser:
-            sentimentinvestor_view.display_trending(
-                start_date=ns_parser.start,
-                hour=ns_parser.hour,
-                export=ns_parser.export,
-                number=ns_parser.number,
-            )
-
-    @log_start_end(log=logger)
     def call_jcdr(self, other_args: List[str]):
         """Process jcdr command"""
         parser = argparse.ArgumentParser(

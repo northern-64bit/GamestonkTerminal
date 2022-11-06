@@ -6,14 +6,14 @@ import argparse
 
 import datetime
 import math
-from typing import Tuple
+from typing import Dict, List, Tuple, Union
 import pandas as pd
 
 import pytz
 import investpy
+from tqdm import tqdm
 
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import log_and_raise
 from openbb_terminal import helper_funcs
 from openbb_terminal.rich_config import console
 
@@ -32,6 +32,244 @@ CATEGORIES = [
     "confidence_index",
 ]
 IMPORTANCES = ["high", "medium", "low", "all"]
+
+# Commented countries either have no data or are not correctly formatted in investpy itself
+MATRIX_COUNTRIES = {
+    "G7": [
+        "United states",
+        "Canada",
+        "Japan",
+        "Germany",
+        "France",
+        "Italy",
+        "United Kingdom",
+    ],
+    "PIIGS": [
+        "Portugal",
+        "Italy",
+        "Ireland",
+        "Greece",
+        "Spain",
+    ],
+    "EZ": [
+        "Austria",
+        "Belgium",
+        "Cyprus",
+        # "Estonia",
+        "Finland",
+        "France",
+        "Germany",
+        "Greece",
+        "Ireland",
+        "Italy",
+        # "Latvia",
+        # "Lithuania",
+        # "Luxembourg",
+        "Malta",
+        "Netherlands",
+        "Portugal",
+        "Slovakia",
+        "Slovenia",
+        "Spain",
+    ],
+    "AMERICAS": [
+        "Brazil",
+        "Canada",
+        "Chile",
+        "Colombia",
+        "Mexico",
+        "Peru",
+        "United states",
+    ],
+    "EUROPE": [
+        "Austria",
+        "Belgium",
+        "Bulgaria",
+        "Croatia",
+        "Cyprus",
+        # "Czech Republic",
+        "Finland",
+        "France",
+        "Germany",
+        "Greece",
+        "Hungary",
+        "Iceland",
+        "Ireland",
+        "Italy",
+        "Malta",
+        "Netherlands",
+        "Norway",
+        "Poland",
+        "Portugal",
+        "Romania",
+        "Russia",
+        "Serbia",
+        "Slovakia",
+        "Slovenia",
+        "Spain",
+        "Switzerland",
+        "Turkey",
+        # "Ukraine",
+        "United Kingdom",
+    ],
+    "ME": [
+        # "Bahrain",
+        "Egypt",
+        "Israel",
+        "Jordan",
+        "Qatar",
+    ],
+    "APAC": [
+        "Australia",
+        "Bangladesh",
+        "China",
+        # "Hong Kong",
+        "India",
+        "Indonesia",
+        "Japan",
+        # "Kazakhstan",
+        "Malaysia",
+        # "New Zealand",
+        "Pakistan",
+        "Philippines",
+        "Singapore",
+        # "South Korea",
+        # "Sri Lanka",
+        "Taiwan",
+        "Vietnam",
+    ],
+    "AFRICA": [
+        # "Botswana",
+        "Kenya",
+        "Mauritius",
+        "Morocco",
+        "Namibia",
+        "Nigeria",
+        # "South Africa",
+        "Uganda",
+    ],
+}
+
+MATRIX_CHOICES = list(MATRIX_COUNTRIES.keys())
+
+
+@log_start_end(log=logger)
+def check_correct_country(country: str, countries: list) -> bool:
+    """Check if country is in list and warn if not."""
+    if country.lower() not in countries:
+        joined_countries = [x.replace(" ", "_").lower() for x in countries]
+        choices = ", ".join(joined_countries)
+        console.print(
+            f"[red]'{country}' is an invalid country. Choose from {choices}[/red]\n"
+        )
+        return False
+    return True
+
+
+@log_start_end(log=logger)
+def countries_string_to_list(countries_list: str) -> List[str]:
+    """Transform countries string to list if countries valid"""
+    valid_countries = [
+        country.lower().strip()
+        for country in countries_list.split(",")
+        if check_correct_country(country.strip(), BOND_COUNTRIES)
+    ]
+
+    if valid_countries:
+        return valid_countries
+    raise argparse.ArgumentTypeError("No valid countries provided.")
+
+
+@log_start_end(log=logger)
+def create_matrix(dictionary: Dict[str, Dict[str, float]]) -> pd.DataFrame:
+    """Create matrix of yield and spreads.
+
+    Parameters
+    ----------
+    dictionary: Dict[str, Dict[str, float]]
+        Dictionary of yield data by country. E.g. {'10Y': {'United States': 4.009, 'Canada': 3.48}}
+
+    Returns
+    -------
+    pd.DataFrame
+        Spread matrix.
+
+    """
+
+    maturity = list(dictionary.keys())[0]
+    d = dictionary[maturity]
+    countries = list(d.keys())
+
+    # Create empty matrix
+    matrix: List[List[float]] = []
+    N = len(d)
+    for i in range(N):
+        matrix.append([0] * N)
+
+    for i, country_i in enumerate(countries):
+        for j, country_j in enumerate(countries):
+            matrix[i][j] = round((d[country_i] - d[country_j]) * 100, 1)
+
+    matrixdf = pd.DataFrame(matrix)
+    matrixdf.columns = list(d.keys())
+    matrixdf = matrixdf.set_index(matrixdf.columns)
+    matrixdf.insert(
+        0, "Yield " + maturity, pd.DataFrame.from_dict(d, orient="index") * 100
+    )
+
+    return matrixdf
+
+
+@log_start_end(log=logger)
+def get_spread_matrix(
+    countries: Union[str, List[str]] = "G7",
+    maturity: str = "10Y",
+    change: bool = False,
+) -> pd.DataFrame:
+    """Get spread matrix. [Source: Investing.com]
+
+    Parameters
+    ----------
+    countries: Union[str, List[str]]
+        Countries or group of countries. List of available countries is accessible through get_ycrv_countries().
+    maturity: str
+        Maturity to get data. By default 10Y.
+    change: bool
+        Flag to use 1 day change or not. By default False.
+
+    Returns
+    -------
+    pd.DataFrame
+        Spread matrix.
+
+    """
+
+    if isinstance(countries, str) and countries.upper() in MATRIX_CHOICES:
+        countries = MATRIX_COUNTRIES[countries.upper()]
+
+    d0: Dict[str, Dict[str, float]] = {maturity: {}}
+    d1: Dict[str, Dict[str, float]] = {maturity: {}}
+    no_data_countries = []
+    for country in tqdm(countries, desc="Downloading"):
+        country = country.title()
+        try:
+            df = investpy.bonds.get_bonds_overview(country)
+            d0[maturity][country] = df[df["name"].str.contains(maturity)]["last"].iloc[
+                0
+            ]
+            d1[maturity][country] = df[df["name"].str.contains(maturity)][
+                "last_close"
+            ].iloc[0]
+        except Exception:
+            no_data_countries.append(country)
+
+    if no_data_countries:
+        s = ", ".join(no_data_countries)
+        console.print(f"[red]No data for {s}.[/red]")
+
+    if change:
+        return create_matrix(d0) - create_matrix(d1)
+    return create_matrix(d0)
 
 
 @log_start_end(log=logger)
@@ -65,19 +303,7 @@ def get_events_categories() -> list:
 
 
 @log_start_end(log=logger)
-def check_correct_country(country: str, countries: list) -> str:
-    """Check if country is in list and warn if not."""
-    if country.lower() not in countries:
-        log_and_raise(
-            argparse.ArgumentTypeError(
-                f"{country} is an invalid country. Choose from {', '.join(countries)}"
-            )
-        )
-    return country
-
-
-@log_start_end(log=logger)
-def get_yieldcurve(country: str) -> pd.DataFrame:
+def get_yieldcurve(country: str = "United States") -> pd.DataFrame:
     """Get yield curve for specified country. [Source: Investing.com]
 
     Parameters
@@ -91,7 +317,7 @@ def get_yieldcurve(country: str) -> pd.DataFrame:
         Country yield curve
     """
 
-    if check_correct_country(country, BOND_COUNTRIES) != country:
+    if not check_correct_country(country, BOND_COUNTRIES):
         return pd.DataFrame()
 
     try:
@@ -115,6 +341,8 @@ def get_yieldcurve(country: str) -> pd.DataFrame:
     )
 
     data = data.replace(float("NaN"), "")
+
+    data["Change"] = (data["Current"] - data["Previous"]) * 100
 
     for i, row in data.iterrows():
         t = row["Tenor"][-3:].strip()
@@ -146,8 +374,8 @@ def get_economic_calendar(
     country: str = "all",
     importance: str = "",
     category: str = "",
-    start_date: datetime.date = None,
-    end_date: datetime.date = None,
+    start_date: str = "",
+    end_date: str = "",
     limit=100,
 ) -> Tuple[pd.DataFrame, str]:
     """Get economic calendar [Source: Investing.com]
@@ -171,7 +399,7 @@ def get_economic_calendar(
         Economic calendar Dataframe and detail string about country/time zone.
     """
 
-    if check_correct_country(country, CALENDAR_COUNTRIES) != country:
+    if not check_correct_country(country, CALENDAR_COUNTRIES):
         return pd.DataFrame(), ""
 
     time_filter = "time_only"
@@ -188,21 +416,36 @@ def get_economic_calendar(
         categories_list = [category.title()]
 
     # Joint default for countries and importances
-    if countries_list == ["all"] and not importances_list:
+    if countries_list == ["all"]:
         countries_list = CALENDAR_COUNTRIES[:-1]
-        importances_list = ["high"]
+        if not importances_list:
+            importances_list = ["high"]
     elif importances_list is None:
         importances_list = ["all"]
 
     if start_date and not end_date:
-        end_date_string = format_date(start_date + datetime.timedelta(days=7))
-        start_date_string = format_date(start_date)
+        end_date_string = (
+            datetime.datetime.strptime(start_date, "%Y-%m-%d")
+            + datetime.timedelta(days=7)
+        ).strftime("%d/%m/%Y")
+        start_date_string = (
+            datetime.datetime.strptime(start_date, "%Y-%m-%d")
+        ).strftime("%d/%m/%Y")
     elif end_date and not start_date:
-        start_date_string = format_date(end_date + datetime.timedelta(days=-7))
-        end_date_string = format_date(end_date)
+        start_date_string = (
+            datetime.datetime.strptime(end_date, "%Y-%m-%d")
+            + datetime.timedelta(days=-7)
+        ).strftime("%d/%m/%Y")
+        end_date_string = (datetime.datetime.strptime(end_date, "%Y-%m-%d")).strftime(
+            "%d/%m/%Y"
+        )
     elif end_date and start_date:
-        start_date_string = format_date(start_date)
-        end_date_string = format_date(end_date)
+        start_date_string = (
+            datetime.datetime.strptime(start_date, "%Y-%m-%d")
+        ).strftime("%d/%m/%Y")
+        end_date_string = (datetime.datetime.strptime(end_date, "%Y-%m-%d")).strftime(
+            "%d/%m/%Y"
+        )
     else:
         start_date_string = None
         end_date_string = None
@@ -219,26 +462,24 @@ def get_economic_calendar(
     sign = "+" if offset > 0 else ""
     time_zone = "GMT " + sign + str(int(offset)) + ":00"
 
+    args = [
+        time_filter,
+        countries_list,
+        importances_list,
+        categories_list,
+        start_date_string,
+        end_date_string,
+    ]
     try:
-        data = investpy.news.economic_calendar(
-            time_zone,
-            time_filter,
-            countries_list,
-            importances_list,
-            categories_list,
-            start_date_string,
-            end_date_string,
-        )
+        data = investpy.news.economic_calendar(time_zone, *args)
     except Exception:
-        data = investpy.news.economic_calendar(
-            None,
-            time_filter,
-            countries_list,
-            importances_list,
-            categories_list,
-            start_date_string,
-            end_date_string,
-        )
+        try:
+            data = investpy.news.economic_calendar(None, *args)
+        except Exception:
+            console.print(
+                f"[red]Economic calendar data not found for {country}.[/red]\n"
+            )
+            return pd.DataFrame(), ""
 
     if data.empty:
         logger.error("No data")

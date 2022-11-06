@@ -3,14 +3,15 @@ __docformat__ = "numpy"
 
 import configparser
 import logging
-import os
-from typing import Tuple
+from pathlib import Path
+from typing import Dict, Tuple, Union
 
 import pandas as pd
 import requests
 import yfinance as yf
 
 from openbb_terminal.decorators import log_start_end
+from openbb_terminal.core.config.paths import USER_PRESETS_DIRECTORY
 from openbb_terminal.rich_config import console
 from openbb_terminal.stocks.options import yfinance_model
 
@@ -34,7 +35,11 @@ accepted_orders = [
 
 @log_start_end(log=logger)
 def get_historical_greeks(
-    symbol: str, expiry: str, strike: float, chain_id: str = "", put: bool = False
+    symbol: str,
+    expiry: str,
+    strike: Union[str, float],
+    chain_id: str = "",
+    put: bool = False,
 ) -> pd.DataFrame:
     """Get histoical option greeks
 
@@ -44,7 +49,7 @@ def get_historical_greeks(
         Stock ticker symbol
     expiry: str
         Option expiration date
-    strike: float
+    strike: Union[str, float]
         Strike price to look for
     chain_id: str
         OCC option symbol.  Overwrites other inputs
@@ -56,6 +61,14 @@ def get_historical_greeks(
     df: pd.DataFrame
         Dataframe containing historical greeks
     """
+    if isinstance(strike, str):
+        try:
+            strike = float(strike)
+        except ValueError:
+            console.print(
+                f"[red]Strike of {strike} cannot be converted to a number.[/red]\n"
+            )
+            return pd.DataFrame()
     if not chain_id:
         options = yfinance_model.get_option_chain(symbol, expiry)
 
@@ -64,7 +77,12 @@ def get_historical_greeks(
         else:
             options = options.calls
 
-        chain_id = options.loc[options.strike == strike, "contractSymbol"].values[0]
+        selection = options.loc[options.strike == strike, "contractSymbol"]
+        try:
+            chain_id = selection.values[0]
+        except IndexError:
+            console.print(f"[red]Strike price of {strike} not found.[/red]\n")
+            return pd.DataFrame()
 
     r = requests.get(f"https://api.syncretism.io/ops/historical/{chain_id}")
 
@@ -113,20 +131,38 @@ def get_historical_greeks(
 
 
 @log_start_end(log=logger)
-def get_screener_output(
-    preset: str = "high_IV",
-    presets_path: str = os.path.join(
-        os.path.abspath(os.path.dirname(__file__)), "..", "presets/"
-    ),
-) -> Tuple[pd.DataFrame, str]:
+def get_preset_choices() -> Dict:
+    """
+    Return a dict containing keys as name of preset and
+    filepath as value
+    """
+
+    PRESETS_PATH = USER_PRESETS_DIRECTORY / "stocks" / "options"
+    PRESETS_PATH_DEFAULT = Path(__file__).parent.parent / "presets"
+    preset_choices = {
+        filepath.name: filepath
+        for filepath in PRESETS_PATH.iterdir()
+        if filepath.suffix == ".ini"
+    }
+    preset_choices.update(
+        {
+            filepath.name: filepath
+            for filepath in PRESETS_PATH_DEFAULT.iterdir()
+            if filepath.suffix == ".ini"
+        }
+    )
+
+    return preset_choices
+
+
+@log_start_end(log=logger)
+def get_screener_output(preset: str) -> Tuple[pd.DataFrame, str]:
     """Screen options based on preset filters
 
     Parameters
     ----------
     preset: str
-        Preset file to screen for
-    presets_path: str
-        Path to preset folder
+        Chosen preset
     Returns
     -------
     pd.DataFrame:
@@ -160,7 +196,10 @@ def get_screener_output(
 
     preset_filter = configparser.RawConfigParser()
     preset_filter.optionxform = str  # type: ignore
-    preset_filter.read(presets_path + preset + ".ini")
+    choices = get_preset_choices()
+    if preset not in choices:
+        return pd.DataFrame(), "No data found"
+    preset_filter.read(choices[preset])
 
     d_filters = {k: v for k, v in dict(preset_filter["FILTER"]).items() if v}
     s_filters = str(d_filters)

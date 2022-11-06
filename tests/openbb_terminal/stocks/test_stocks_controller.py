@@ -7,6 +7,7 @@ import pytest
 
 # IMPORTATION INTERNAL
 from openbb_terminal.stocks import stocks_controller
+from tests.test_helpers import no_dfs
 
 # pylint: disable=E1101
 # pylint: disable=W0603
@@ -267,7 +268,14 @@ def test_call_func_expect_queue(expected_queue, func, queue):
         (
             "call_quote",
             [],
-            "stocks_helper.quote",
+            "stocks_views.display_quote",
+            [],
+            dict(),
+        ),
+        (
+            "call_tob",
+            ["--ticker=AAPL"],
+            "cboe_view.display_top_of_book",
             [],
             dict(),
         ),
@@ -287,7 +295,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
             dict(
                 data=EMPTY_DF,
                 sortby="Open",
-                descend=False,
+                ascend=False,
                 limit=1,
             ),
         ),
@@ -310,6 +318,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
                 intraday=False,
                 add_trend=True,
                 ma=[20, 30],
+                yscale="linear",
             ),
         ),
         (
@@ -455,7 +464,7 @@ def test_call_func(
 
         getattr(controller, tested_func)(other_args)
 
-        if called_args or called_kwargs:
+        if called_args or called_kwargs and no_dfs(called_args, called_kwargs):
             mock.assert_called_once_with(*called_args, **called_kwargs)
         else:
             mock.assert_called_once()
@@ -501,7 +510,6 @@ def test_call_func_no_parser(func, mocker):
         "call_bt",
         "call_ta",
         "call_qa",
-        "call_pred",
     ],
 )
 def test_call_func_no_ticker(func, mocker):

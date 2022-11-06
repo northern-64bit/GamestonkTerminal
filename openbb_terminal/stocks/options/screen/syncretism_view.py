@@ -4,7 +4,7 @@ __docformat__ = "numpy"
 import configparser
 import logging
 import os
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import matplotlib.pyplot as plt
 
@@ -24,25 +24,19 @@ logger = logging.getLogger(__name__)
 
 
 @log_start_end(log=logger)
-def view_available_presets(
-    preset: str = "high_IV",
-    presets_path: str = os.path.join(
-        os.path.abspath(os.path.dirname(__file__)), "..", "presets/"
-    ),
-):
+def view_available_presets(preset: str):
     """View available presets.
 
     Parameters
     ----------
     preset: str
-       Preset to look at
-    presets_path: str
-        Path to presets folder
+        Chosen preset
     """
     if preset:
         preset_filter = configparser.RawConfigParser()
         preset_filter.optionxform = str  # type: ignore
-        preset_filter.read(os.path.join(presets_path, preset + ".ini"))
+        preset_choices = syncretism_model.get_preset_choices()
+        preset_filter.read(preset_choices[preset])
         filters_headers = ["FILTER"]
         console.print("")
 
@@ -63,10 +57,7 @@ def view_available_presets(
 
 @log_start_end(log=logger)
 def view_screener_output(
-    preset: str = "high_IV",
-    presets_path: str = os.path.join(
-        os.path.abspath(os.path.dirname(__file__)), "..", "presets/"
-    ),
+    preset: str,
     limit: int = 20,
     export: str = "",
 ) -> List:
@@ -75,9 +66,7 @@ def view_screener_output(
     Parameters
     ----------
     preset: str
-        Preset file to screen for
-    presets_path: str
-        Path to preset folder
+        Chosen preset
     limit: int
         Number of randomly sorted rows to display
     export: str
@@ -88,7 +77,7 @@ def view_screener_output(
     List
         List of tickers screened
     """
-    df_res, error_msg = syncretism_model.get_screener_output(preset, presets_path)
+    df_res, error_msg = syncretism_model.get_screener_output(preset)
     if error_msg:
         console.print(error_msg, "\n")
         return []
@@ -117,12 +106,12 @@ def view_screener_output(
 def view_historical_greeks(
     symbol: str,
     expiry: str,
-    strike: float,
+    strike: Union[float, str],
     greek: str = "Delta",
     chain_id: str = "",
     put: bool = False,
     raw: bool = False,
-    limit: int = 20,
+    limit: Union[int, str] = 20,
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
@@ -134,7 +123,7 @@ def view_historical_greeks(
         Stock ticker
     expiry: str
         Expiration date
-    strike: float
+    strike: Union[str, float]
         Strike price to consider
     greek: str
         Greek variable to plot
@@ -152,10 +141,25 @@ def view_historical_greeks(
         External axes (1 axis is expected in the list), by default None
     """
     df = syncretism_model.get_historical_greeks(symbol, expiry, strike, chain_id, put)
+    if df is None:
+        return
+    if df.empty:
+        return
 
+    if isinstance(limit, str):
+        try:
+            limit = int(limit)
+        except ValueError:
+            console.print(
+                f"[red]Could not convert limit of {limit} to a number.[/red]\n"
+            )
+            return
     if raw:
         print_rich_table(
-            df.tail(limit), headers=list(df.columns), title="Historical Greeks"
+            df.tail(limit),
+            headers=list(df.columns),
+            title="Historical Greeks",
+            show_index=True,
         )
 
     if not external_axes:
@@ -165,7 +169,12 @@ def view_historical_greeks(
     else:
         return
 
-    im1 = ax.plot(df.index, df[greek], label=greek.title(), color=theme.up_color)
+    try:
+        greek_df = df[greek.lower()]
+    except KeyError:
+        console.print(f"[red]Could not find greek {greek} in data.[/red]\n")
+        return
+    im1 = ax.plot(df.index, greek_df, label=greek.title(), color=theme.up_color)
     ax.set_ylabel(greek)
     ax1 = ax.twinx()
     im2 = ax1.plot(df.index, df.price, label="Stock Price", color=theme.down_color)

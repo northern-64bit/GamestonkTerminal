@@ -7,7 +7,8 @@ from typing import List, Dict
 
 import numpy as np
 import pandas as pd
-from prompt_toolkit.completion import NestedCompleter
+
+from openbb_terminal.custom_prompt_toolkit import NestedCompleter
 
 from openbb_terminal import feature_flags as obbff
 from openbb_terminal.common.quantitative_analysis import qa_view, rolling_view
@@ -51,6 +52,8 @@ class QaController(StockBaseController):
         "goodness",
         "unitroot",
     ]
+    FULLER_REG = ["c", "ct", "ctt", "nc"]
+    KPS_REG = ["c", "ct"]
 
     PATH = "/economy/qa/"
 
@@ -83,7 +86,68 @@ class QaController(StockBaseController):
         if session and obbff.USE_PROMPT_TOOLKIT:
             choices: dict = {c: {} for c in self.controller_choices}
             choices["pick"] = {c: {} for c in self.options}
-            choices["pick"]["-c"] = {c: {} for c in self.options}
+            choices["unitroot"] = {
+                "--fuller_reg": {c: {} for c in self.FULLER_REG},
+                "-r": "--fuller_reg",
+                "--kps_reg": {c: {} for c in self.KPS_REG},
+                "-k": "--kps_reg",
+            }
+            choices["line"] = {
+                "--log": {},
+                "--ml": None,
+                "--ms": None,
+            }
+            choices["hist"] = {
+                "--bins": {str(c): {} for c in range(10, 100)},
+                "-b": "--bins",
+            }
+            choices["bw"] = {
+                "--yearly": {},
+                "-y": {},
+            }
+            choices["acf"] = {
+                "--lags": {str(c): {} for c in range(5, 100)},
+                "-l": "--lags",
+            }
+            choices["rolling"] = {
+                "--window": {str(c): {} for c in range(5, 100)},
+                "-w": "--window",
+            }
+            choices["spread"] = {
+                "--window": {str(c): {} for c in range(5, 100)},
+                "-w": "--window",
+            }
+            choices["quantile"] = {
+                "--window": {str(c): {} for c in range(5, 100)},
+                "-w": "--window",
+                "--quantile": {str(c): {} for c in np.arange(0.0, 1.0, 0.01)},
+                "-q": "--quantile",
+            }
+            choices["skew"] = {
+                "--window": {str(c): {} for c in range(5, 100)},
+                "-w": "--window",
+            }
+            choices["kurtosis"] = {
+                "--window": {str(c): {} for c in range(5, 100)},
+                "-w": "--window",
+            }
+            choices["raw"] = {
+                "--limit": {str(c): {} for c in range(1, 100)},
+                "-l": "--limit",
+                "--sortby": {},
+                "-s": "--sortby",
+                "--descend": {},
+            }
+            choices["decompose"] = {
+                "--multiplicative": None,
+                "-m": "--multiplicative",
+            }
+            choices["cusum"] = {
+                "--threshold": None,
+                "-t": "--threshold",
+                "--drift": None,
+                "-d": "--drift",
+            }
 
             choices["support"] = self.SUPPORT_CHOICES
             choices["about"] = self.ABOUT_CHOICES
@@ -188,16 +252,27 @@ class QaController(StockBaseController):
             dest="descend",
             help="Sort in descending order",
         )
+        parser.add_argument(
+            "-s",
+            "--sortby",
+            help="The column to sort by",
+            type=str.lower,
+            dest="sortby",
+        )
 
         ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
+        if isinstance(self.data, pd.Series):
+            data = self.data.to_frame()
+        else:
+            data = self.data
         if ns_parser:
             qa_view.display_raw(
-                data=self.data,
+                data=data,
                 limit=ns_parser.limit,
-                sortby="",
-                descend=ns_parser.descend,
+                sortby=ns_parser.sortby,
+                ascend=not ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -227,20 +302,12 @@ class QaController(StockBaseController):
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             add_help=False,
             prog="line",
-            description="Show line plot of selected data and allow to draw lines or highlight specific datetimes.",
+            description="Show line plot of selected data or highlight specific datetimes.",
         )
         parser.add_argument(
             "--log",
             help="Plot with y on log scale",
             dest="log",
-            action="store_true",
-            default=False,
-        )
-        parser.add_argument(
-            "-d",
-            "--draw",
-            help="Draw lines and annotate on the plot",
-            dest="draw",
             action="store_true",
             default=False,
         )
@@ -267,7 +334,6 @@ class QaController(StockBaseController):
                 self.data,
                 title=f"{self.current_id.upper()}",
                 log_y=ns_parser.log,
-                draw=ns_parser.draw,
                 markers_lines=ns_parser.ml,
                 markers_scatter=ns_parser.ms,
             )

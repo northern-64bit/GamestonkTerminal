@@ -18,13 +18,16 @@ from openbb_terminal.cryptocurrency.dataframe_helpers import (
 from openbb_terminal.cryptocurrency.due_diligence.pycoingecko_model import (
     get_coin_tokenomics,
 )
-from openbb_terminal.decorators import log_start_end
+from openbb_terminal.decorators import check_api_key, log_start_end
 from openbb_terminal.helper_funcs import lambda_long_number_format
 from openbb_terminal.rich_config import console
+
+# pylint: disable=unsupported-assignment-operation
 
 logger = logging.getLogger(__name__)
 
 INTERVALS_TIMESERIES = ["5m", "15m", "30m", "1h", "1d", "1w"]
+# pylint: disable=unsupported-assignment-operation
 
 
 @log_start_end(log=logger)
@@ -112,6 +115,7 @@ def get_marketcap_dominance(
 
 
 @log_start_end(log=logger)
+@check_api_key(["API_MESSARI_KEY"])
 def get_messari_timeseries(
     symbol: str,
     timeseries_id: str,
@@ -179,6 +183,7 @@ def get_messari_timeseries(
 
 
 @log_start_end(log=logger)
+@check_api_key(["API_MESSARI_KEY"])
 def get_links(symbol: str) -> pd.DataFrame:
     """Returns asset's links
     [Source: https://messari.io/]
@@ -217,6 +222,7 @@ def get_links(symbol: str) -> pd.DataFrame:
 
 
 @log_start_end(log=logger)
+@check_api_key(["API_MESSARI_KEY"])
 def get_roadmap(symbol: str, ascend: bool = True) -> pd.DataFrame:
     """Returns coin roadmap
     [Source: https://messari.io/]
@@ -263,6 +269,7 @@ def get_roadmap(symbol: str, ascend: bool = True) -> pd.DataFrame:
 
 
 @log_start_end(log=logger)
+@check_api_key(["API_MESSARI_KEY"])
 def get_tokenomics(symbol: str, coingecko_id: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Returns coin tokenomics
     [Source: https://messari.io/]
@@ -332,6 +339,7 @@ def get_tokenomics(symbol: str, coingecko_id: str) -> Tuple[pd.DataFrame, pd.Dat
 
 
 @log_start_end(log=logger)
+@check_api_key(["API_MESSARI_KEY"])
 def get_project_product_info(
     symbol: str,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -400,6 +408,7 @@ def get_project_product_info(
 
 
 @log_start_end(log=logger)
+@check_api_key(["API_MESSARI_KEY"])
 def get_team(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Returns coin team
     [Source: https://messari.io/]
@@ -475,6 +484,7 @@ def get_team(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 
 @log_start_end(log=logger)
+@check_api_key(["API_MESSARI_KEY"])
 def get_investors(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Returns coin investors
     [Source: https://messari.io/]
@@ -548,6 +558,7 @@ def get_investors(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 
 @log_start_end(log=logger)
+@check_api_key(["API_MESSARI_KEY"])
 def get_governance(symbol: str) -> Tuple[str, pd.DataFrame]:
     """Returns coin governance
     [Source: https://messari.io/]
@@ -618,6 +629,7 @@ def format_addresses(x: Any):
 
 
 @log_start_end(log=logger)
+@check_api_key(["API_MESSARI_KEY"])
 def get_fundraising(
     symbol: str,
 ) -> Tuple[str, pd.DataFrame, pd.DataFrame, pd.DataFrame]:

@@ -142,7 +142,7 @@ class NestedCompleter(Completer):
         return f"NestedCompleter({self.options!r}, ignore_case={self.ignore_case!r})"
 
     @classmethod
-    def from_nested_dict(cls, data: NestedDict) -> "NestedCompleter":
+    def from_nested_dict(cls, data: dict) -> "NestedCompleter":
         """
         Create a `NestedCompleter`, starting from a nested dictionary data
         structure, like this:
@@ -259,12 +259,8 @@ class NestedCompleter(Completer):
                             elif same_flags[1] in self.flags_processed:
                                 self.flags_processed.remove(same_flags[1])
 
-                if cmd:
-                    self.options = {
-                        k: self.original_options.get(cmd).options[k]  # type: ignore
-                        for k in self.original_options.get(cmd).options.keys()  # type: ignore
-                        if k not in self.flags_processed
-                    }
+                if cmd and self.original_options.get(cmd):
+                    self.options = self.original_options
                 else:
                     self.options = {
                         k: self.original_options[k]
@@ -275,7 +271,7 @@ class NestedCompleter(Completer):
             if "-" not in text:
                 completer = self.options.get(first_term)
             else:
-                if cmd in self.options:
+                if cmd in self.options and self.options.get(cmd):
                     completer = self.options.get(cmd).options.get(first_term)  # type: ignore
                 else:
                     completer = self.options.get(first_term)
@@ -382,16 +378,14 @@ class NestedCompleter(Completer):
                             if k not in self.flags_processed
                         }
 
-            if (
-                cmd
-                and cmd in self.options.keys()
-                and [
-                    text in val
-                    for val in [
-                        f"{cmd} {opt}" for opt in self.options.get(cmd).options.keys()  # type: ignore
-                    ]
-                ]
-            ):
+            command = self.options.get(cmd)
+            if command:
+                options = command.options  # type: ignore
+            else:
+                options = {}
+            command_options = [f"{cmd} {opt}" for opt in options.keys()]
+            text_list = [text in val for val in command_options]
+            if cmd and cmd in self.options.keys() and text_list:
                 completer = WordCompleter(
                     list(self.options.get(cmd).options.keys()),  # type: ignore
                     ignore_case=self.ignore_case,

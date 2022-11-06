@@ -114,6 +114,7 @@ class CreateExcelFA:
         i = 0
         while True:
             path = dcf_model.generate_path(i, self.info["symbol"], self.data["now"])
+            path.parent.mkdir(parents=True, exist_ok=True)
 
             if not path.is_file():
                 self.wb.save(path)
@@ -125,7 +126,7 @@ class CreateExcelFA:
     def get_data(self, statement: str, row: int, header: bool) -> pd.DataFrame:
         df, rounding, _ = dcf_model.create_dataframe(self.info["symbol"], statement)
         if df.empty:
-            raise ValueError("Could generate a dataframe for the ticker symbol")
+            raise ValueError("Could not generate a dataframe for the ticker symbol")
         self.info["rounding"] = rounding
         if not self.info["len_data"]:
             self.info["len_data"] = len(df.columns)
@@ -156,7 +157,7 @@ class CreateExcelFA:
 
         column = 1
 
-        for key, value in df.iteritems():
+        for key, value in df.items():
             rowI = row
             if header:
                 dcf_model.set_cell(

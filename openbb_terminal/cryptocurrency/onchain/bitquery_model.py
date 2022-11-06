@@ -18,7 +18,7 @@ from openbb_terminal.cryptocurrency.dataframe_helpers import (
 )
 from openbb_terminal import config_terminal as cfg
 from openbb_terminal.rich_config import console
-from openbb_terminal.decorators import log_start_end
+from openbb_terminal.decorators import check_api_key, log_start_end
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +156,7 @@ def _extract_dex_trades(data: dict) -> pd.DataFrame:
 
 
 @log_start_end(log=logger)
+@check_api_key(["API_BITQUERY_KEY"])
 def query_graph(url: str, query: str) -> dict:
     """Helper methods for querying graphql api. [Source: https://bitquery.io/]
 
@@ -399,7 +400,7 @@ def get_dex_trades_monthly(
 def get_daily_dex_volume_for_given_pair(
     limit: int = 100,
     symbol: str = "UNI",
-    vs: str = "USDT",
+    to_symbol: str = "USDT",
     sortby: str = "date",
     ascend: bool = True,
 ) -> pd.DataFrame:
@@ -411,7 +412,7 @@ def get_daily_dex_volume_for_given_pair(
         Last n days to query data
     symbol: str
         ERC20 token symbol
-    vs: str
+    to_symbol: str
         Quote currency.
     sortby: str
         Key by which to sort data
@@ -428,7 +429,7 @@ def get_daily_dex_volume_for_given_pair(
         "%Y-%m-%d"
     )
 
-    base, quote = find_token_address(symbol), find_token_address(vs)
+    base, quote = find_token_address(symbol), find_token_address(to_symbol)
     if not base or not quote:
         raise ValueError("Provided coin or quote currency doesn't exist\n")
 
@@ -722,7 +723,7 @@ def get_most_traded_pairs(
 @log_start_end(log=logger)
 def get_spread_for_crypto_pair(
     symbol: str = "WETH",
-    vs: str = "USDT",
+    to_symbol: str = "USDT",
     limit: int = 30,
     sortby: str = "tradeAmount",
     ascend: bool = True,
@@ -736,7 +737,7 @@ def get_spread_for_crypto_pair(
         Last n days to query data
     symbol: str
         ERC20 token symbol
-    vs: str
+    to_symbol: str
         Quoted currency.
     sortby: str
         Key by which to sort data
@@ -750,7 +751,7 @@ def get_spread_for_crypto_pair(
     """
 
     dt = (datetime.date.today() - datetime.timedelta(limit)).strftime("%Y-%m-%d")
-    base, quote = find_token_address(symbol), find_token_address(vs)
+    base, quote = find_token_address(symbol), find_token_address(to_symbol)
 
     if not base or not quote:
         raise ValueError("Provided coin or quote currency doesn't exist\n")

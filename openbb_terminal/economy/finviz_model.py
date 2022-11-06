@@ -13,7 +13,10 @@ from openbb_terminal.rich_config import console
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.helper_funcs import get_user_agent
 
+# pylint: disable=unsupported-assignment-operation
+
 logger = logging.getLogger(__name__)
+# pylint: disable=unsupported-assignment-operation
 
 GROUPS = {
     "sector": "Sector",
@@ -48,7 +51,6 @@ def get_performance_map(period: str = "1d", map_filter: str = "sp500"):
     # Conversion from period and type, to fit url requirements
     d_period = {"1d": "", "1w": "w1", "1m": "w4", "3m": "w13", "6m": "w26", "1y": "w52"}
     d_type = {"sp500": "sec", "world": "geo", "full": "sec_all", "etf": "etf"}
-    # TODO: Try to get this image and output it instead of opening browser
     url = f"https://finviz.com/map.ashx?t={d_type[map_filter]}&st={d_period[period]}"
     webbrowser.open(url)
     console.print("")
@@ -62,7 +64,7 @@ def get_groups() -> list:
 
 @log_start_end(log=logger)
 def get_valuation_data(
-    group: str = "sector", sort_by: str = "Name", ascending: bool = True
+    group: str = "sector", sortby: str = "Name", ascend: bool = True
 ) -> pd.DataFrame:
     """Get group (sectors, industry or country) valuation data. [Source: Finviz]
 
@@ -70,9 +72,9 @@ def get_valuation_data(
     ----------
     group : str
        Group by category. Available groups can be accessed through get_groups().
-    sort_by : str
+    sortby : str
         Column to sort by
-    ascending : bool
+    ascend : bool
         Flag to sort in ascending order
 
     Returns
@@ -96,7 +98,7 @@ def get_valuation_data(
             else float(x.strip("M")) / 1000
         )
         df_group.columns = [col.replace(" ", "") for col in df_group.columns]
-        df_group = df_group.sort_values(by=sort_by, ascending=ascending)
+        df_group = df_group.sort_values(by=sortby, ascending=ascend)
         df_group["Volume"] = df_group["Volume"] / 1_000_000
         df_group = df_group.rename(columns={"Volume": "Volume [1M]"})
         df_group.fillna("", inplace=True)
@@ -108,7 +110,7 @@ def get_valuation_data(
 
 @log_start_end(log=logger)
 def get_performance_data(
-    group: str = "sector", sort_by: str = "Name", ascending: bool = True
+    group: str = "sector", sortby: str = "Name", ascend: bool = True
 ) -> pd.DataFrame:
     """Get group (sectors, industry or country) performance data. [Source: Finviz]
 
@@ -116,9 +118,9 @@ def get_performance_data(
     ----------
     group : str
        Group by category. Available groups can be accessed through get_groups().
-    sort_by : str
+    sortby : str
         Column to sort by
-    ascending : bool
+    ascend : bool
         Flag to sort in ascending order
 
     Returns
@@ -149,7 +151,7 @@ def get_performance_data(
             }
         )
         df_group["Week"] = df_group["Week"].apply(lambda x: float(x.strip("%")) / 100)
-        df_group = df_group.sort_values(by=sort_by, ascending=ascending)
+        df_group = df_group.sort_values(by=sortby, ascending=ascend)
         df_group["Volume"] = df_group["Volume"] / 1_000_000
         df_group["AvgVolume"] = df_group["AvgVolume"] / 1_000_000
         df_group = df_group.rename(
@@ -183,7 +185,7 @@ def get_spectrum_data(group: str = "sector"):
 
 @log_start_end(log=logger)
 def get_futures(
-    future_type: str = "Indices", sort_by: str = "ticker", ascending: bool = False
+    future_type: str = "Indices", sortby: str = "ticker", ascend: bool = False
 ) -> pd.DataFrame:
     """Get futures data. [Source: Finviz]
 
@@ -191,9 +193,9 @@ def get_futures(
     ----------
     future_type : str
         From the following: Indices, Energy, Metals, Meats, Grains, Softs, Bonds, Currencies
-    sort_by : str
+    sortby : str
         Column to sort by
-    ascending : bool
+    ascend : bool
         Flag to sort in ascending order
 
     Returns
@@ -229,7 +231,7 @@ def get_futures(
 
     df = pd.DataFrame(d_futures[future_type])
     df = df.set_index("label")
-    df = df.sort_values(by=sort_by, ascending=ascending)
+    df = df.sort_values(by=sortby, ascending=ascend)
 
     df = df[["prevClose", "last", "change"]].fillna("")
 

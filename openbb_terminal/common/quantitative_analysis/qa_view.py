@@ -27,7 +27,6 @@ from openbb_terminal.config_terminal import theme
 from openbb_terminal.common.quantitative_analysis import qa_model
 from openbb_terminal.config_plot import PLOT_DPI
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_classes import LineAnnotateDrawer
 from openbb_terminal.helper_funcs import (
     export_data,
     plot_autoscale,
@@ -51,7 +50,7 @@ def lambda_color_red(val: Any) -> str:
 
 
 @log_start_end(log=logger)
-def display_summary(data: pd.DataFrame, export: str = ""):
+def display_summary(data: pd.DataFrame, export: str = "") -> None:
     """Show summary statistics
 
     Parameters
@@ -86,7 +85,7 @@ def display_hist(
     target: str,
     bins: int = 15,
     external_axes: Optional[List[plt.Axes]] = None,
-):
+) -> None:
     """Generate of histogram of data
 
     Parameters
@@ -262,7 +261,7 @@ def display_bw(
     symbol: str = "",
     yearly: bool = True,
     external_axes: Optional[List[plt.Axes]] = None,
-):
+) -> None:
     """Show box and whisker plots
 
     Parameters
@@ -358,7 +357,7 @@ def display_acf(
     symbol: str = "",
     lags: int = 15,
     external_axes: Optional[List[plt.Axes]] = None,
-):
+) -> None:
     """Show Auto and Partial Auto Correlation of returns and change in returns
 
     Parameters
@@ -395,7 +394,9 @@ def display_acf(
     sm.graphics.tsa.plot_acf(np.diff(np.diff(data.values)), lags=lags, ax=ax1)
     ax1.set_title(f"{symbol} Returns Auto-Correlation", fontsize=9)
     # Diff Partial auto - correlation function for original time series
-    sm.graphics.tsa.plot_pacf(np.diff(np.diff(data.values)), lags=lags, ax=ax2)
+    sm.graphics.tsa.plot_pacf(
+        np.diff(np.diff(data.values)), lags=lags, ax=ax2, method="ywm"
+    )
     ax2.set_title(
         f"{symbol} Returns Partial Auto-Correlation",
         fontsize=9,
@@ -408,7 +409,9 @@ def display_acf(
         fontsize=9,
     )
     # Diff Diff Partial auto-correlation function for original time series
-    sm.graphics.tsa.plot_pacf(np.diff(np.diff(data.values)), lags=lags, ax=ax4)
+    sm.graphics.tsa.plot_pacf(
+        np.diff(np.diff(data.values)), lags=lags, ax=ax4, method="ywm"
+    )
     ax4.set_title(
         f"Change in {symbol} Returns Partial Auto-Correlation",
         fontsize=9,
@@ -437,7 +440,7 @@ def display_qqplot(
     target: str,
     symbol: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
-):
+) -> None:
     """Show QQ plot for data against normal quantiles
 
     Parameters
@@ -622,7 +625,7 @@ def display_seasonal(
     multiplicative: bool = False,
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
-):
+) -> None:
     """Display seasonal decomposition data
 
     Parameters
@@ -763,7 +766,7 @@ def display_seasonal(
 
 
 @log_start_end(log=logger)
-def display_normality(data: pd.DataFrame, target: str, export: str = ""):
+def display_normality(data: pd.DataFrame, target: str, export: str = "") -> None:
     """View normality statistics
 
     Parameters
@@ -841,7 +844,7 @@ def display_unitroot(
 def display_raw(
     data: pd.DataFrame,
     sortby: str = "",
-    descend: bool = False,
+    ascend: bool = False,
     limit: int = 20,
     export: str = "",
 ) -> None:
@@ -853,7 +856,7 @@ def display_raw(
         DataFrame with historical information
     sortby : str
         The column to sort by
-    descend : bool
+    ascend : bool
         Whether to sort descending
     limit : int
         Number of rows to show
@@ -861,30 +864,37 @@ def display_raw(
         Export data as CSV, JSON, XLSX
     """
 
-    export_data(
-        export,
-        os.path.dirname(os.path.abspath(__file__)),
-        "history",
-        data,
-    )
-
     if isinstance(data, pd.Series):
         df1 = pd.DataFrame(data)
     else:
         df1 = data.copy()
 
     if sortby:
-        df1 = data.sort_values(
-            by=sortby if sortby != "AdjClose" else "Adj Close", ascending=descend
-        )
+        try:
+            sort_col = [x.lower().replace(" ", "") for x in df1.columns].index(
+                sortby.lower().replace(" ", "")
+            )
+        except ValueError:
+            console.print("[red]The provided column is not a valid option[/red]\n")
+            return
+        df1 = df1.sort_values(by=data.columns[sort_col], ascending=ascend)
+    else:
+        df1 = df1.sort_index(ascending=ascend)
     df1.index = [x.strftime("%Y-%m-%d") for x in df1.index]
 
     print_rich_table(
-        df1.head(limit) if sortby else df1.tail(limit),
+        df1.head(limit),
         headers=[x.title() if x != "" else "Date" for x in df1.columns],
         title="[bold]Raw Data[/bold]",
         show_index=True,
         floatfmt=".3f",
+    )
+
+    export_data(
+        export,
+        os.path.dirname(os.path.abspath(__file__)),
+        "raw",
+        data,
     )
 
 
@@ -893,12 +903,11 @@ def display_line(
     data: pd.Series,
     title: str = "",
     log_y: bool = True,
-    draw: bool = False,
     markers_lines: Optional[List[datetime]] = None,
     markers_scatter: Optional[List[datetime]] = None,
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
-):
+) -> None:
     """Display line plot of data
 
     Parameters
@@ -909,8 +918,6 @@ def display_line(
         Title for plot
     log_y: bool
         Flag for showing y on log scale
-    draw: bool
-        Flag for drawing lines and annotating on the plot
     markers_lines: Optional[List[datetime]]
         List of dates to highlight using vertical lines
     markers_scatter: Optional[List[datetime]]
@@ -983,8 +990,6 @@ def display_line(
 
     if title:
         ax.set_title(title)
-    if draw:
-        LineAnnotateDrawer(ax).draw_lines_and_annotate()
 
     theme.style_primary_axis(ax)
 
@@ -1004,10 +1009,10 @@ def display_var(
     use_mean: bool = False,
     adjusted_var: bool = False,
     student_t: bool = False,
-    percentile: float = 0.999,
+    percentile: float = 99.9,
     data_range: int = 0,
     portfolio: bool = False,
-):
+) -> None:
     """Displays VaR of dataframe
 
     Parameters
@@ -1031,38 +1036,28 @@ def display_var(
     """
 
     if data_range > 0:
-        var_list, hist_var_list = qa_model.get_var(
+        df = qa_model.get_var(
             data[-data_range:], use_mean, adjusted_var, student_t, percentile, portfolio
         )
     else:
-        var_list, hist_var_list = qa_model.get_var(
+        df = qa_model.get_var(
             data, use_mean, adjusted_var, student_t, percentile, portfolio
         )
 
-    str_hist_label = "Historical VaR:"
-
     if adjusted_var:
-        str_var_label = "Adjusted VaR:"
         str_title = "Adjusted "
     elif student_t:
-        str_var_label = "Student-t VaR"
         str_title = "Student-t "
     else:
-        str_var_label = "VaR:"
         str_title = ""
 
     if symbol != "":
         symbol += " "
 
-    data_dictionary = {str_var_label: var_list, str_hist_label: hist_var_list}
-    data = pd.DataFrame(
-        data_dictionary, index=["90.0%", "95.0%", "99.0%", f"{percentile*100}%"]
-    )
-
     print_rich_table(
-        data,
+        df,
         show_index=True,
-        headers=list(data.columns),
+        headers=list(df.columns),
         title=f"[bold]{symbol}{str_title}Value at Risk[/bold]",
         floatfmt=".4f",
     )
@@ -1073,9 +1068,9 @@ def display_es(
     symbol: str = "",
     use_mean: bool = False,
     distribution: str = "normal",
-    percentile: float = 0.999,
+    percentile: float = 99.9,
     portfolio: bool = False,
-):
+) -> None:
     """Displays expected shortfall
 
     Parameters
@@ -1093,43 +1088,30 @@ def display_es(
     portfolio: bool
         If the data is a portfolio
     """
-    es_list, hist_es_list = qa_model.get_es(
-        data, use_mean, distribution, percentile, portfolio
-    )
-
-    str_hist_label = "Historical ES:"
+    df = qa_model.get_es(data, use_mean, distribution, percentile, portfolio)
 
     if distribution == "laplace":
-        str_es_label = "Laplace ES:"
         str_title = "Laplace "
     elif distribution == "student_t":
-        str_es_label = "Student-t ES"
         str_title = "Student-t "
     elif distribution == "logistic":
-        str_es_label = "Logistic ES"
         str_title = "Logistic "
     else:
-        str_es_label = "ES:"
         str_title = ""
 
     if symbol != "":
         symbol += " "
 
-    data_dictionary = {str_es_label: es_list, str_hist_label: hist_es_list}
-    data = pd.DataFrame(
-        data_dictionary, index=["90.0%", "95.0%", "99.0%", f"{percentile*100}%"]
-    )
-
     print_rich_table(
-        data,
+        df,
         show_index=True,
-        headers=list(data.columns),
+        headers=list(df.columns),
         title=f"[bold]{symbol}{str_title}Expected Shortfall[/bold]",
         floatfmt=".4f",
     )
 
 
-def display_sharpe(data: pd.DataFrame, rfr: float = 0, window: float = 252):
+def display_sharpe(data: pd.DataFrame, rfr: float = 0, window: float = 252) -> None:
     """Calculates the sharpe ratio
     Parameters
     ----------
@@ -1155,7 +1137,7 @@ def display_sharpe(data: pd.DataFrame, rfr: float = 0, window: float = 252):
 
 def display_sortino(
     data: pd.DataFrame, target_return: float, window: float, adjusted: bool
-):
+) -> None:
     """Displays the sortino ratio
     Parameters
     ----------
@@ -1187,7 +1169,7 @@ def display_sortino(
 
 def display_omega(
     data: pd.DataFrame, threshold_start: float = 0, threshold_end: float = 1.5
-):
+) -> None:
     """Displays the omega ratio
     Parameters
     ----------
@@ -1198,15 +1180,11 @@ def display_omega(
     threshold_end: float
         annualized target return threshold end of plotted threshold range
     """
-    threshold = np.linspace(threshold_start, threshold_end, 50)
-    omega_list = []
-
-    for i in threshold:
-        omega_list.append(qa_model.get_omega(data, i))
+    df = qa_model.get_omega(data, threshold_start, threshold_end)
 
     # Plotting
     fig, ax = plt.subplots()
-    ax.plot(threshold, omega_list)
+    ax.plot(df["threshold"], df["omega"])
     ax.set_title(f"Omega Curve - over last {len(data)}'s period")
     ax.set_ylabel("Omega Ratio")
     ax.set_xlabel("Threshold (%)")

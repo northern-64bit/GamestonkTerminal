@@ -8,6 +8,7 @@ import pandas as pd
 
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.rich_config import console
+from openbb_terminal.common.technical_analysis import ta_helpers
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +16,9 @@ logger = logging.getLogger(__name__)
 @log_start_end(log=logger)
 def calculate_fib_levels(
     data: pd.DataFrame,
-    period: int = 120,
-    open_date: Any = None,
-    close_date: Any = None,
+    limit: int = 120,
+    start_date: Any = None,
+    end_date: Any = None,
 ) -> Tuple[pd.DataFrame, pd.Timestamp, pd.Timestamp, float, float]:
     """Calculate Fibonacci levels
 
@@ -25,11 +26,11 @@ def calculate_fib_levels(
     ----------
     data : pd.DataFrame
         Dataframe of prices
-    period : int
+    limit : int
         Days to look back for retracement
-    open_date : Any
+    start_date : Any
         Custom start date for retracement
-    close_date : Any
+    end_date : Any
         Custom end date for retracement
 
     Returns
@@ -45,20 +46,23 @@ def calculate_fib_levels(
     max_pr: float
         Price at max point
     """
-    if open_date and close_date:
-        if open_date not in data.index:
-            date0 = data.index[data.index.get_loc(open_date, method="nearest")]
+    close_col = ta_helpers.check_columns(data, high=False, low=False)
+    if close_col is None:
+        return pd.DataFrame(), pd.Timestamp(), pd.Timestamp(), 0, 0
+    if start_date and end_date:
+        if start_date not in data.index:
+            date0 = data.index[data.index.get_loc(start_date, method="nearest")]
             console.print(f"Start date not in data.  Using nearest: {date0}")
         else:
-            date0 = open_date
-        if close_date not in data.index:
-            date1 = data.index[data.index.get_loc(close_date, method="nearest")]
+            date0 = start_date
+        if end_date not in data.index:
+            date1 = data.index[data.index.get_loc(end_date, method="nearest")]
             console.print(f"End date not in data.  Using nearest: {date1}")
         else:
-            date1 = close_date
+            date1 = end_date
 
-        data0 = data.loc[date0, "Adj Close"]
-        data1 = data.loc[date1, "Adj Close"]
+        data0 = data.loc[date0, close_col]
+        data1 = data.loc[date1, close_col]
 
         min_pr = min(data0, data1)
         max_pr = max(data0, data1)
@@ -70,7 +74,7 @@ def calculate_fib_levels(
             min_date = date1
             max_date = date0
     else:
-        data_to_use = data.iloc[period:]["Adj Close"]
+        data_to_use = data.iloc[limit:][close_col]
 
         min_pr = data_to_use.min()
         min_date = data_to_use.idxmin()

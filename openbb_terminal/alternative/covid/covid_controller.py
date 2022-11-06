@@ -7,7 +7,7 @@ import pathlib
 from typing import List
 
 import pandas as pd
-from prompt_toolkit.completion import NestedCompleter
+from openbb_terminal.custom_prompt_toolkit import NestedCompleter
 
 from openbb_terminal import feature_flags as obbff
 from openbb_terminal.alternative.covid import covid_view
@@ -37,13 +37,36 @@ class CovidController(BaseController):
         super().__init__(queue)
 
         self.country = "US"
-        self.COUNTRY_LIST = pd.read_csv(country_file, sep="|", index_col=None)[
-            "Countries"
-        ].to_list()
+        countries_df = pd.read_csv(country_file, sep="|", index_col=None)
+        countries_list = countries_df["Countries"].to_list()
+        self.COUNTRY_LIST = [x.lower().replace(" ", "_") for x in countries_list]
 
         if session and obbff.USE_PROMPT_TOOLKIT:
             choices: dict = {c: {} for c in self.controller_choices}
-            choices["country"] = {c: None for c in self.COUNTRY_LIST}
+            choices["country"] = {
+                "--country": {c: None for c in self.COUNTRY_LIST},
+                "-c": "--country",
+            }
+            choices["ov"] = {
+                "--raw": {},
+                "--limit": {str(c): {} for c in range(1, 1000)},
+                "-l": "--limit",
+            }
+            choices["rates"] = {
+                "--raw": {},
+                "--limit": {str(c): {} for c in range(1, 1000)},
+                "-l": "--limit",
+            }
+            choices["cases"] = {
+                "--raw": {},
+                "--limit": {str(c): {} for c in range(1, 1000)},
+                "-l": "--limit",
+            }
+            choices["deaths"] = {
+                "--raw": {},
+                "--limit": {str(c): {} for c in range(1, 1000)},
+                "-l": "--limit",
+            }
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def print_help(self):
@@ -76,8 +99,9 @@ class CovidController(BaseController):
         parser.add_argument(
             "-c",
             "--country",
-            nargs="+",
-            type=str,
+            type=str.lower,
+            choices=self.COUNTRY_LIST,
+            metavar="country_name",
             dest="country",
             help="Country to get data for.",
         )
@@ -86,11 +110,13 @@ class CovidController(BaseController):
         ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             if ns_parser.country:
-                country = " ".join(ns_parser.country)
-                if country not in self.COUNTRY_LIST:
-                    logger.error("%s not a valid selection", country)
-                    console.print(f"[red]{country} not a valid selection.[/red]\n")
+                if ns_parser.country not in self.COUNTRY_LIST:
+                    logger.error("%s not a valid selection", ns_parser.country)
+                    console.print(
+                        f"[red]{ns_parser.country} not a valid selection.[/red]\n"
+                    )
                     return
+                country = ns_parser.country.title().replace("_", " ")
                 self.country = country
                 console.print(f"[cyan]{country}[/cyan] loaded\n")
             else:
@@ -99,7 +125,7 @@ class CovidController(BaseController):
 
     @log_start_end(log=logger)
     def call_ov(self, other_args: List[str]):
-        """Process hist command"""
+        """Process ov command"""
         parser = argparse.ArgumentParser(
             add_help=False,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -232,7 +258,10 @@ class CovidController(BaseController):
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED, limit=10
         )
         if ns_parser:
-            covid_view.display_country_slopes(
+            if ns_parser.days < 2:
+                console.print("[red]Days must be greater than 1[/red]")
+                return
+            covid_view.display_case_slopes(
                 days_back=ns_parser.days,
                 limit=ns_parser.limit,
                 ascend=ns_parser.ascend,

@@ -8,10 +8,11 @@ import webbrowser
 from datetime import datetime
 from typing import List
 
+import numpy as np
 import pandas as pd
-from prompt_toolkit.completion import NestedCompleter
 
 from openbb_terminal import feature_flags as obbff
+from openbb_terminal.custom_prompt_toolkit import NestedCompleter
 from openbb_terminal.common.technical_analysis import (
     custom_indicators_view,
     momentum_view,
@@ -33,8 +34,7 @@ from openbb_terminal.helper_funcs import (
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import StockBaseController
-from openbb_terminal.rich_config import console, MenuText
-from openbb_terminal.stocks import stocks_helper
+from openbb_terminal.rich_config import console, MenuText, get_ordered_list_sources
 from openbb_terminal.stocks.technical_analysis import (
     finbrain_view,
     finviz_view,
@@ -78,6 +78,8 @@ class TechnicalAnalysisController(StockBaseController):
         "fib",
         "tv",
         "clenow",
+        "demark",
+        "atr",
     ]
     PATH = "/stocks/ta/"
 
@@ -99,11 +101,139 @@ class TechnicalAnalysisController(StockBaseController):
 
         if session and obbff.USE_PROMPT_TOOLKIT:
             choices: dict = {c: {} for c in self.controller_choices}
-            choices["load"]["-i"] = {c: {} for c in stocks_helper.INTERVALS}
-            choices["load"]["-s"] = {c: {} for c in stocks_helper.SOURCES}
-            choices["recom"]["-i"] = {c: {} for c in tradingview_model.INTERVALS.keys()}
-            choices["recom"]["-s"] = {c: {} for c in tradingview_model.SCREENERS}
-            choices["kc"]["-m"] = {c: {} for c in volatility_model.MAMODES}
+            one_to_hundred: dict = {str(c): {} for c in range(1, 100)}
+            zero_to_hundred: dict = {str(c): {} for c in range(0, 100)}
+            choices["load"] = {
+                "--ticker": None,
+                "-t": "--ticker",
+                "--start": None,
+                "-s": "--start",
+                "--end": None,
+                "-e": "--end",
+                "--interval": {c: {} for c in ["1", "5", "15", "30", "60"]},
+                "-i": "--interval",
+                "--prepost": {},
+                "-p": "--prepost",
+                "--file": None,
+                "-f": "--file",
+                "--monthly": {},
+                "-m": "--monthly",
+                "--weekly": {},
+                "-w": "--weekly",
+                "--iexrange": {c: {} for c in ["ytd", "1y", "2y", "5y", "6m"]},
+                "-r": "--iexrange",
+                "--source": {
+                    c: {} for c in get_ordered_list_sources(f"{self.PATH}load")
+                },
+            }
+            ma = {
+                "--length": None,
+                "-l": "--length",
+                "--offset": zero_to_hundred,
+                "-o": "--offset",
+            }
+            choices["ema"] = ma
+            choices["sma"] = ma
+            choices["wma"] = ma
+            choices["hma"] = ma
+            choices["zlma"] = ma
+            choices["vwap"] = {
+                "--offset": zero_to_hundred,
+                "-o": "--offset",
+                "--start": None,
+                "--end": None,
+            }
+            choices["cci"] = {
+                "--length": one_to_hundred,
+                "-l": "--length",
+                "--scalar": None,
+                "-s": "--scalar",
+            }
+            choices["macd"] = {
+                "--fast": one_to_hundred,
+                "--slow": "--fast",
+                "--signal": "--fast",
+            }
+            choices["cci"] = {
+                "--length": one_to_hundred,
+                "-l": "--length",
+                "--scalar": None,
+                "-s": "--scalar",
+                "--drift": "--length",
+                "-d": "--drift",
+            }
+            choices["stoch"] = {
+                "--fastkperiod": one_to_hundred,
+                "-k": "--fastkperiod",
+                "--slowdperiod": "--fastkperiod",
+                "-d": "--slowdperiod",
+                "--slowkperiod": "--fastkperiod",
+            }
+            choices["fisher"] = {
+                "--length": one_to_hundred,
+                "-l": "--length",
+            }
+            choices["cg"] = {
+                "--length": one_to_hundred,
+                "-l": "--length",
+            }
+            choices["adx"] = {
+                "--length": one_to_hundred,
+                "-l": "--length",
+                "--scalar": None,
+                "-s": "--scalar",
+                "--drift": "--length",
+                "-d": "--drift",
+            }
+            choices["aroon"] = {
+                "--length": one_to_hundred,
+                "-l": "--length",
+                "--scalar": None,
+                "-s": "--scalar",
+            }
+            choices["bbands"] = {
+                "--length": one_to_hundred,
+                "-l": "--length",
+                "--std": {str(c): {} for c in np.arange(0.0, 10, 0.25)},
+                "-s": "--std",
+                "--mamode": {c: {} for c in volatility_model.MAMODES},
+                "-m": "--mamode",
+            }
+            choices["donchian"] = {
+                "--length_upper": one_to_hundred,
+                "-u": "--length_upper",
+                "--length_lower": "--length_upper",
+                "-l": "--length_lower",
+            }
+            choices["kc"] = {
+                "--length": one_to_hundred,
+                "-l": "--length",
+                "--scalar": None,
+                "-s": "--scalar",
+                "--mamode": {c: {} for c in volatility_model.MAMODES},
+                "-m": "--mamode",
+                "--offset": zero_to_hundred,
+                "-o": "--offset",
+            }
+            choices["ad"]["--open"] = {}
+            choices["adosc"] = {
+                "--open": {},
+                "--fast": one_to_hundred,
+                "--slow": "--fast",
+            }
+            choices["fib"] = {
+                "--period": {str(c): {} for c in range(1, 960)},
+                "--start": None,
+                "--end": None,
+            }
+            choices["recom"] = {
+                "--screener": {c: {} for c in tradingview_model.SCREENERS},
+                "-s": "--screener",
+                "--interval": {c: {} for c in tradingview_model.INTERVALS.keys()},
+                "-i": "--interval",
+                "--exchange": None,
+                "-e": "--exchange",
+            }
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def print_help(self):
@@ -140,6 +270,7 @@ class TechnicalAnalysisController(StockBaseController):
         mt.add_cmd("fisher")
         mt.add_cmd("cg")
         mt.add_cmd("clenow")
+        mt.add_cmd("demark")
         mt.add_info("_trend_")
         mt.add_cmd("adx")
         mt.add_cmd("aroon")
@@ -147,6 +278,7 @@ class TechnicalAnalysisController(StockBaseController):
         mt.add_cmd("bbands")
         mt.add_cmd("donchian")
         mt.add_cmd("kc")
+        mt.add_cmd("atr")
         mt.add_info("_volume_")
         mt.add_cmd("ad")
         mt.add_cmd("adosc")
@@ -318,7 +450,7 @@ class TechnicalAnalysisController(StockBaseController):
             overlap_view.view_ma(
                 ma_type="EMA",
                 symbol=self.ticker,
-                series=self.stock["Adj Close"],
+                data=self.stock["Adj Close"],
                 window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
@@ -370,7 +502,7 @@ class TechnicalAnalysisController(StockBaseController):
             overlap_view.view_ma(
                 ma_type="SMA",
                 symbol=self.ticker,
-                series=self.stock["Adj Close"],
+                data=self.stock["Adj Close"],
                 window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
@@ -419,7 +551,7 @@ class TechnicalAnalysisController(StockBaseController):
             overlap_view.view_ma(
                 ma_type="WMA",
                 symbol=self.ticker,
-                series=self.stock["Adj Close"],
+                data=self.stock["Adj Close"],
                 window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
@@ -468,7 +600,7 @@ class TechnicalAnalysisController(StockBaseController):
             overlap_view.view_ma(
                 ma_type="HMA",
                 symbol=self.ticker,
-                series=self.stock["Adj Close"],
+                data=self.stock["Adj Close"],
                 window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
@@ -520,7 +652,7 @@ class TechnicalAnalysisController(StockBaseController):
             overlap_view.view_ma(
                 ma_type="ZLMA",
                 symbol=self.ticker,
-                series=self.stock["Adj Close"],
+                data=self.stock["Adj Close"],
                 window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
@@ -578,12 +710,12 @@ class TechnicalAnalysisController(StockBaseController):
                 interval_text = self.interval
 
             overlap_view.view_vwap(
-                symbol=self.ticker,
-                s_interval=interval_text,
                 data=self.stock,
+                symbol=self.ticker,
                 start_date=ns_parser.start,
                 end_date=ns_parser.end,
                 offset=ns_parser.n_offset,
+                interval=interval_text,
                 export=ns_parser.export,
             )
 
@@ -685,7 +817,7 @@ class TechnicalAnalysisController(StockBaseController):
         if ns_parser:
             momentum_view.display_macd(
                 symbol=self.ticker,
-                series=self.stock["Adj Close"],
+                data=self.stock["Adj Close"],
                 n_fast=ns_parser.n_fast,
                 n_slow=ns_parser.n_slow,
                 n_signal=ns_parser.n_signal,
@@ -745,7 +877,7 @@ class TechnicalAnalysisController(StockBaseController):
         if ns_parser:
             momentum_view.display_rsi(
                 symbol=self.ticker,
-                series=self.stock["Adj Close"],
+                data=self.stock["Adj Close"],
                 window=ns_parser.n_length,
                 scalar=ns_parser.n_scalar,
                 drift=ns_parser.n_drift,
@@ -920,7 +1052,7 @@ class TechnicalAnalysisController(StockBaseController):
         if ns_parser:
             momentum_view.display_cg(
                 symbol=self.ticker,
-                series=self.stock["Adj Close"],
+                data=self.stock["Adj Close"],
                 window=ns_parser.n_length,
                 export=ns_parser.export,
             )
@@ -1380,7 +1512,7 @@ class TechnicalAnalysisController(StockBaseController):
             custom_indicators_view.fibonacci_retracement(
                 symbol=self.ticker,
                 data=self.stock,
-                period=ns_parser.period,
+                limit=ns_parser.period,
                 start_date=ns_parser.start,
                 end_date=ns_parser.end,
                 export=ns_parser.export,
@@ -1415,5 +1547,91 @@ class TechnicalAnalysisController(StockBaseController):
         )
         if ns_parser:
             momentum_view.display_clenow_momentum(
-                self.stock["Adj Close"], ns_parser.period, ns_parser.export
+                self.stock["Adj Close"],
+                self.ticker.upper(),
+                ns_parser.period,
+                ns_parser.export,
+            )
+
+    @log_start_end(log=logger)
+    def call_demark(self, other_args: List[str]):
+        """Process demark command"""
+        parser = argparse.ArgumentParser(
+            add_help=False,
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog="demark",
+            description="Calculates the Demark sequential indicator.",
+        )
+        parser.add_argument(
+            "-m",
+            "--min",
+            help="Minimum value of indicator to show (declutters plot).",
+            dest="min_to_show",
+            type=check_positive,
+            default=5,
+        )
+
+        ns_parser = self.parse_known_args_and_warn(
+            parser, other_args, EXPORT_ONLY_FIGURES_ALLOWED
+        )
+        if ns_parser:
+            momentum_view.display_demark(
+                self.stock,
+                self.ticker.upper(),
+                min_to_show=ns_parser.min_to_show,
+                export=ns_parser.export,
+            )
+
+    @log_start_end(log=logger)
+    def call_atr(self, other_args: List[str]):
+        """Process atr command"""
+        parser = argparse.ArgumentParser(
+            add_help=False,
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog="atr",
+            description="""
+                 Averge True Range is used to measure volatility, especially volatility caused by
+                gaps or limit moves.
+            """,
+        )
+        parser.add_argument(
+            "-l",
+            "--length",
+            action="store",
+            dest="n_length",
+            type=check_positive,
+            default=14,
+            help="Window length",
+        )
+        parser.add_argument(
+            "-m",
+            "--mamode",
+            action="store",
+            dest="s_mamode",
+            default="ema",
+            choices=volatility_model.MAMODES,
+            help="mamode",
+        )
+        parser.add_argument(
+            "-o",
+            "--offset",
+            action="store",
+            dest="n_offset",
+            type=int,
+            default=0,
+            help="offset",
+        )
+
+        ns_parser = self.parse_known_args_and_warn(
+            parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
+        )
+
+        if ns_parser:
+            volatility_view.display_atr(
+                data=self.stock,
+                symbol=self.ticker,
+                window=ns_parser.n_length,
+                mamode=ns_parser.s_mamode,
+                offset=ns_parser.n_offset,
+                export=ns_parser.export,
             )

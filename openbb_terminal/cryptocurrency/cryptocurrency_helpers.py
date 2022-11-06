@@ -15,6 +15,7 @@ import numpy as np
 import ccxt
 from binance.client import Client
 import matplotlib.pyplot as plt
+from matplotlib.ticker import LogLocator, ScalarFormatter
 import yfinance as yf
 import mplfinance as mpf
 from pycoingecko import CoinGeckoAPI
@@ -303,26 +304,28 @@ def get_coinpaprika_id(symbol: str):
     return coinpaprika_id
 
 
-def load(
+def load_from_ccxt(
     symbol: str,
     start_date: datetime = (datetime.now() - timedelta(days=1100)),
-    interval: str = "1440",  # 1, 15, 30, 60, 240, 1440, 10080, 43200
+    interval: str = "1440",
     exchange: str = "binance",
     vs_currency: str = "usdt",
-    end_date: datetime = datetime.now(),
-    source: str = "ccxt",
-):
-    """Load crypto currency to perform analysis on CoinGecko is used as source for price and
-    YahooFinance for volume.
+) -> pd.DataFrame:
+    """Load crypto currency data [Source: https://github.com/ccxt/ccxt]
 
     Parameters
     ----------
     symbol: str
         Coin to get
-    vs: str
-        Quote Currency (usd or eur), by default usd
-    days: int
-        Data up to number of days ago, by default 365
+    start_date: datetime
+        The datetime to start at
+    interval: str
+        The interval between data points in minutes.
+        Choose from: 1, 15, 30, 60, 240, 1440, 10080, 43200
+    exchange: str:
+        The exchange to get data from.
+    vs_currency: str
+        Quote Currency (Defaults to usdt)
 
     Returns
     -------
@@ -330,87 +333,188 @@ def load(
         Dataframe consisting of price and volume data
     """
     df = pd.DataFrame()
-    if source == "ccxt":
-        pair = f"{symbol.upper()}/{vs_currency.upper()}"
-        try:
-            df = fetch_ccxt_ohlc(
-                exchange,
-                3,
-                pair,
-                CCXT_INTERVAL_MAP[interval],
-                int(datetime.timestamp(start_date)) * 1000,
-                1000,
-            )
-            if df.empty:
-                console.print(f"\nPair {pair} not found in {exchange}\n")
-                return pd.DataFrame()
-        except Exception:
-            console.print(f"\nPair {pair} not found on {exchange}\n")
-            return df
-    elif source == "CoinGecko":
-        delta = datetime.now() - start_date
-        days = delta.days
-        if days > 365:
-            console.print("Coingecko free tier only allows a max of 365 days\n")
-            days = 365
-        coingecko_id = get_coingecko_id(symbol)
-        if not coingecko_id:
-            console.print(f"{symbol} not found in Coingecko\n")
-            return df
-        df = pycoingecko_model.get_ohlc(coingecko_id, vs_currency, days)
-        df_coin = yf.download(
-            f"{symbol}-{vs_currency}",
-            end=datetime.now(),
+    pair = f"{symbol.upper()}/{vs_currency.upper()}"
+
+    try:
+        df = fetch_ccxt_ohlc(
+            exchange,
+            3,
+            pair,
+            CCXT_INTERVAL_MAP[interval],
+            int(datetime.timestamp(start_date)) * 1000,
+            1000,
+        )
+        if df.empty:
+            console.print(f"\nPair {pair} not found in {exchange}\n")
+            return pd.DataFrame()
+    except Exception:
+        console.print(f"\nPair {pair} not found on {exchange}\n")
+        return df
+    return df
+
+
+def load_from_coingecko(
+    symbol: str,
+    start_date: datetime = (datetime.now() - timedelta(days=1100)),
+    vs_currency: str = "usdt",
+) -> pd.DataFrame:
+    """Load crypto currency data [Source: https://www.coingecko.com/]
+
+    Parameters
+    ----------
+    symbol: str
+        Coin to get
+    start_date: datetime
+        The datetime to start at
+    vs_currency: str
+        Quote Currency (Defaults to usdt)
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe consisting of price and volume data
+    """
+    df = pd.DataFrame()
+    delta = datetime.now() - start_date
+    days = delta.days
+
+    if days > 365:
+        console.print("Coingecko free tier only allows a max of 365 days\n")
+        days = 365
+
+    coingecko_id = get_coingecko_id(symbol)
+    if not coingecko_id:
+        console.print(f"{symbol} not found in Coingecko\n")
+        return df
+
+    df = pycoingecko_model.get_ohlc(coingecko_id, vs_currency, days)
+    df_coin = yf.download(
+        f"{symbol}-{vs_currency}",
+        end=datetime.now(),
+        start=start_date,
+        progress=False,
+        interval="1d",
+    ).sort_index(ascending=False)
+
+    if not df_coin.empty:
+        df = pd.merge(df, df_coin[::-1][["Volume"]], left_index=True, right_index=True)
+    df.index.name = "date"
+    return df
+
+
+def load_from_yahoofinance(
+    symbol: str,
+    start_date: datetime = (datetime.now() - timedelta(days=1100)),
+    interval: str = "1440",
+    vs_currency: str = "usdt",
+    end_date: datetime = datetime.now(),
+) -> pd.DataFrame:
+    """Load crypto currency data [Source: https://finance.yahoo.com/]
+
+    Parameters
+    ----------
+    symbol: str
+        Coin to get
+    start_date: datetime
+        The datetime to start at
+    interval: str
+        The interval between data points in minutes.
+        Choose from: 1, 15, 30, 60, 240, 1440, 10080, 43200
+    vs_currency: str
+        Quote Currency (Defaults to usdt)
+    end_date: datetime
+       The datetime to end at
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe consisting of price and volume data
+    """
+    pair = f"{symbol}-{vs_currency}"
+    if int(interval) >= 1440:
+        YF_INTERVAL_MAP = {
+            "1440": "1d",
+            "10080": "1wk",
+            "43200": "1mo",
+        }
+        df = yf.download(
+            pair,
+            end=end_date,
             start=start_date,
             progress=False,
-            interval="1d",
-        ).sort_index(ascending=False)
+            interval=YF_INTERVAL_MAP[interval],
+        ).sort_index(ascending=True)
+    else:
+        s_int = str(interval) + "m"
+        d_granularity = {"1m": 6, "5m": 59, "15m": 59, "30m": 59, "60m": 729}
+        s_start_dt = datetime.utcnow() - timedelta(days=d_granularity[s_int])
+        s_date_start = s_start_dt.strftime("%Y-%m-%d")
+        df = yf.download(
+            pair,
+            start=s_date_start
+            if s_start_dt > start_date
+            else start_date.strftime("%Y-%m-%d"),
+            progress=False,
+            interval=s_int,
+        )
 
-        if not df_coin.empty:
-            df = pd.merge(
-                df, df_coin[::-1][["Volume"]], left_index=True, right_index=True
-            )
-        df.index.name = "date"
+    open_sum = df["Open"].sum()
+    if open_sum == 0:
+        console.print(f"\nPair {pair} has invalid data on Yahoo Finance\n")
+        return pd.DataFrame()
 
-    elif source == "YahooFinance":
-        pair = f"{symbol}-{vs_currency}"
-        if int(interval) >= 1440:
-            YF_INTERVAL_MAP = {
-                "1440": "1d",
-                "10080": "1wk",
-                "43200": "1mo",
-            }
-            df = yf.download(
-                pair,
-                end=end_date,
-                start=start_date,
-                progress=False,
-                interval=YF_INTERVAL_MAP[interval],
-            ).sort_index(ascending=True)
-        else:
-            s_int = str(interval) + "m"
-            d_granularity = {"1m": 6, "5m": 59, "15m": 59, "30m": 59, "60m": 729}
-            s_start_dt = datetime.utcnow() - timedelta(days=d_granularity[s_int])
-            s_date_start = s_start_dt.strftime("%Y-%m-%d")
-            df = yf.download(
-                pair,
-                start=s_date_start
-                if s_start_dt > start_date
-                else start_date.strftime("%Y-%m-%d"),
-                progress=False,
-                interval=s_int,
-            )
-
-        open_sum = df["Open"].sum()
-        if open_sum == 0:
-            console.print(f"\nPair {pair} has invalid data on Yahoo Finance\n")
-            return pd.DataFrame()
-
-        if df.empty:
-            console.print(f"\nPair {pair} not found in Yahoo Finance\n")
-            return pd.DataFrame()
-        df.index.name = "date"
+    if df.empty:
+        console.print(f"\nPair {pair} not found in Yahoo Finance\n")
+        return pd.DataFrame()
+    df.index.name = "date"
     return df
+
+
+def load(
+    symbol: str,
+    start_date: datetime = (datetime.now() - timedelta(days=1100)),
+    interval: str = "1440",
+    exchange: str = "binance",
+    vs_currency: str = "usdt",
+    end_date: datetime = datetime.now(),
+    source: str = "CCXT",
+) -> pd.DataFrame:
+    """Load crypto currency to get data for
+
+    Parameters
+    ----------
+    symbol: str
+        Coin to get
+    start_date: datetime
+        The datetime to start at
+    interval: str
+        The interval between data points in minutes.
+        Choose from: 1, 15, 30, 60, 240, 1440, 10080, 43200
+    exchange: str:
+        The exchange to get data from.
+    vs_currency: str
+        Quote Currency (Defaults to usdt)
+    end_date: datetime
+       The datetime to end at
+    source: str
+        The source of the data
+        Choose from: CCXT, CoinGecko, YahooFinance
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe consisting of price and volume data
+    """
+    if source == "CCXT":
+        return load_from_ccxt(symbol, start_date, interval, exchange, vs_currency)
+    if source == "CoinGecko":
+        return load_from_coingecko(symbol, start_date, vs_currency)
+    if source == "YahooFinance":
+        return load_from_yahoofinance(
+            symbol, start_date, interval, vs_currency, end_date
+        )
+    console.print("[red]Invalid source sent[/red]\n")
+    return pd.DataFrame()
 
 
 def show_quick_performance(
@@ -455,11 +559,6 @@ def show_quick_performance(
         df["Volume (7D avg)"] = lambda_long_number_format(np.mean(volumes[-9:-2]), 2)
 
     df.insert(0, f"\nPrice ({current_currency.upper()})", closes[-1])
-    # df.insert(
-    #    len(df.columns),
-    #    f"Market Cap ({current_currency.upper()})",
-    #    lambda_long_number_format(int(crypto_df["Market Cap"][-1])),
-    # )
 
     try:
         coingecko_id = get_coingecko_id(symbol)
@@ -887,8 +986,9 @@ def find(
         coins_df = get_coin_list()
         coins_list = coins_df[key].to_list()
         if key in ["symbol", "id"]:
-            coin = query.lower()
-        sim = difflib.get_close_matches(coin, coins_list, limit)
+            query = query.lower()
+
+        sim = difflib.get_close_matches(query, coins_list, limit)
         df = pd.Series(sim).to_frame().reset_index()
         df.columns = ["index", key]
         coins_df.drop("index", axis=1, inplace=True)
@@ -900,9 +1000,9 @@ def find(
         keys = {"name": "title", "symbol": "upper", "id": "lower"}
 
         func_key = keys[key]
-        coin = getattr(coin, str(func_key))()
+        query = getattr(query, str(func_key))()
 
-        sim = difflib.get_close_matches(coin, coins_list, limit)
+        sim = difflib.get_close_matches(query, coins_list, limit)
         df = pd.Series(sim).to_frame().reset_index()
         df.columns = ["index", key]
         df = df.merge(coins_df, on=key)
@@ -910,7 +1010,7 @@ def find(
     elif source == "Binance":
 
         # TODO: Fix it in future. Determine if user looks for symbol like ETH or ethereum
-        if len(coin) > 5:
+        if len(query) > 5:
             key = "id"
 
         coins_df_gecko = get_coin_list()
@@ -920,13 +1020,13 @@ def find(
         )
         coins_list = coins[key].to_list()
 
-        sim = difflib.get_close_matches(coin, coins_list, limit)
+        sim = difflib.get_close_matches(query, coins_list, limit)
         df = pd.Series(sim).to_frame().reset_index()
         df.columns = ["index", key]
         df = df.merge(coins, on=key)
 
     elif source == "Coinbase":
-        if len(coin) > 5:
+        if len(query) > 5:
             key = "id"
 
         coins_df_gecko = get_coin_list()
@@ -936,7 +1036,7 @@ def find(
         )
         coins_list = coins[key].to_list()
 
-        sim = difflib.get_close_matches(coin, coins_list, limit)
+        sim = difflib.get_close_matches(query, coins_list, limit)
         df = pd.Series(sim).to_frame().reset_index()
         df.columns = ["index", key]
         df = df.merge(coins, on=key)
@@ -1272,11 +1372,13 @@ def display_all_coins(
 
 def plot_chart(
     prices_df: pd.DataFrame,
-    symbol: str = "",
-    currency: str = "",
+    to_symbol: str = "",
+    from_symbol: str = "",
     source: str = "",
     exchange: str = "",
-    interval: str = "",  # pylint: disable=unused-argument
+    interval: str = "",
+    external_axes: list[plt.Axes] | None = None,
+    yscale: str = "linear",
 ) -> None:
     """Load data for Technical Analysis
 
@@ -1284,11 +1386,14 @@ def plot_chart(
     ----------
     prices_df: pd.DataFrame
         Cryptocurrency
-    symbol: str
+    to_symbol: str
         Coin (only used for chart title), by default ""
-    currency: str
+    from_symbol: str
         Currency (only used for chart title), by default ""
+    yscale: str
+        Scale for y axis of plot Either linear or log
     """
+    del interval
 
     if prices_df.empty:
         console.print("There is not data to plot chart\n")
@@ -1296,7 +1401,8 @@ def plot_chart(
 
     exchange_str = f"/{exchange}" if source == "ccxt" else ""
     title = (
-        f"{source}{exchange_str} - {symbol.upper()}/{currency.upper()} from {prices_df.index[0].strftime('%Y/%m/%d')} "
+        f"{source}{exchange_str} - {to_symbol.upper()}/{from_symbol.upper()}"
+        f" from {prices_df.index[0].strftime('%Y/%m/%d')} "
         f"to {prices_df.index[-1].strftime('%Y/%m/%d')}"
     )
 
@@ -1309,9 +1415,11 @@ def plot_chart(
         title=title,
         volume=True,
         ylabel="Volume [1M]" if volume_mean > 1_000_000 else "Volume",
+        external_axes=external_axes,
+        yscale=yscale,
     )
 
-    console.print("")
+    console.print()
 
 
 def plot_candles(
@@ -1320,6 +1428,7 @@ def plot_candles(
     ylabel: str = "",
     title: str = "",
     external_axes: list[plt.Axes] | None = None,
+    yscale: str = "linear",
 ) -> None:
     """Plot candle chart from dataframe. [Source: Binance]
 
@@ -1335,6 +1444,8 @@ def plot_candles(
         Title of graph, by default ""
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
+    yscale : str
+        Scaling for y axis.  Either linear or log
     """
     candle_chart_kwargs = {
         "type": "candle",
@@ -1350,6 +1461,7 @@ def plot_candles(
             "volume_width": 0.8,
         },
         "warn_too_much_data": 10000,
+        "yscale": yscale,
     }
 
     # This plot has 2 axes
@@ -1368,6 +1480,12 @@ def plot_candles(
             y=1,
         )
         lambda_long_number_format_y_axis(candles_df, "Volume", ax)
+        if yscale == "log":
+            ax[0].yaxis.set_major_formatter(ScalarFormatter())
+            ax[0].yaxis.set_major_locator(
+                LogLocator(base=100, subs=[1.0, 2.0, 5.0, 10.0])
+            )
+            ax[0].ticklabel_format(style="plain", axis="y")
         theme.visualize_output(force_tight_layout=False)
     else:
         nr_external_axes = 2 if volume else 1

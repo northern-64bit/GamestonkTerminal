@@ -4,22 +4,25 @@ __docformat__ = "numpy"
 import logging
 
 from datetime import datetime, timedelta
-from typing import Dict
+from typing import Any, List, Tuple
 import requests
+import pandas as pd
 from openbb_terminal import config_terminal as cfg
-from openbb_terminal.decorators import log_start_end
+from openbb_terminal.decorators import check_api_key, log_start_end
 from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
 
 
 @log_start_end(log=logger)
+@check_api_key(["API_NEWS_TOKEN"])
 def get_news(
     query: str,
+    limit: int = 10,
     start_date: str = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),
     show_newest: bool = True,
     sources: str = "",
-) -> Dict:
+) -> List[Tuple[Any, Any]]:
     """Get news for a given term. [Source: NewsAPI]
 
     Parameters
@@ -31,20 +34,24 @@ def get_news(
     show_newest: bool
         flag to show newest articles first
     sources: str
-        sources to exclusively show news from
+        sources to exclusively show news from (comma separated)
 
     Returns
     ----------
-    articles : dict
-        term to search on the news articles
+    tables : List[Tuple]
+        List of tuples containing news df in first index and dict containing title of news df
     """
     link = (
-        f"https://newsapi.org/v2/everything?q={query}&from={start_date}&sortBy=publishedAt&language=en"
-        f"&apiKey={cfg.API_NEWS_TOKEN}"
+        f"https://newsapi.org/v2/everything?q={query}&from={start_date}&sortBy=publishedAt"
+        "&language=en"
     )
 
     if sources:
-        link += f"&domain={sources}"
+        if "," in sources:
+            sources = ".com,".join(sources.split(","))
+        link += f"&domains={sources}.com"
+
+    link += f"&apiKey={cfg.API_NEWS_TOKEN}"
 
     response = requests.get(link)
 
@@ -54,7 +61,8 @@ def get_news(
     if response.status_code == 200:
         response_json = response.json()
         console.print(
-            f"{response_json['totalResults']} news articles for {query} were found since {start_date}\n"
+            f"{response_json['totalResults']} news articles for",
+            f" {query} were found since {start_date}\n",
         )
 
         if show_newest:
@@ -75,4 +83,33 @@ def get_news(
     else:
         console.print(f"Error in request: {response.json()['message']}", "\n")
 
-    return articles
+    tables = []
+    if articles:
+        for idx, article in enumerate(articles):
+            # Unnecessary to use source name because contained in link article["source"]["name"]
+            if "description" in article:
+                data = [
+                    [article["publishedAt"].replace("T", " ").replace("Z", "")],
+                    [f"{article['description']}"],
+                    [article["url"]],
+                ]
+                table = pd.DataFrame(
+                    data, index=["published", "content", "link"], columns=["Content"]
+                )
+
+            else:
+                data = [
+                    [article["publishedAt"].replace("T", " ").replace("Z", "")],
+                    [article["url"]],
+                ]
+
+                table = pd.DataFrame(
+                    data, index=["published", "link"], columns=["Content"]
+                )
+
+            table.columns = table.columns.str.title()
+            tables.append((table, article))
+            if idx >= limit - 1:
+                break
+
+    return tables

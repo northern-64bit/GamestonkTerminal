@@ -3,10 +3,9 @@ __docformat__ = "numpy"
 
 import argparse
 import logging
-import os
 from typing import List
 
-from prompt_toolkit.completion import NestedCompleter
+from openbb_terminal.custom_prompt_toolkit import NestedCompleter
 
 from openbb_terminal import feature_flags as obbff
 from openbb_terminal.decorators import log_start_end
@@ -15,7 +14,7 @@ from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
 from openbb_terminal.rich_config import MenuText, console
 from openbb_terminal.stocks.comparison_analysis import ca_controller
-from openbb_terminal.stocks.options.screen import syncretism_view
+from openbb_terminal.stocks.options.screen import syncretism_view, syncretism_model
 
 # pylint: disable=E1121
 
@@ -31,12 +30,8 @@ class ScreenerController(BaseController):
         "ca",
     ]
 
-    presets_path = os.path.join(
-        os.path.abspath(os.path.dirname(__file__)), "..", "presets/"
-    )
-    preset_choices = [
-        f.split(".")[0] for f in os.listdir(presets_path) if f.endswith(".ini")
-    ]
+    preset_choices = syncretism_model.get_preset_choices()
+
     PATH = "/stocks/options/screen/"
 
     def __init__(self, queue: List[str] = None):
@@ -48,8 +43,15 @@ class ScreenerController(BaseController):
 
         if session and obbff.USE_PROMPT_TOOLKIT:
             choices: dict = {c: {} for c in self.controller_choices}
-            choices["view"] = {c: None for c in self.preset_choices}
-            choices["set"] = {c: None for c in self.preset_choices}
+
+            one_to_hundred: dict = {str(c): {} for c in range(1, 100)}
+            presets: dict = {c: {} for c in self.preset_choices}
+            choices["view"] = presets
+            choices["set"] = presets
+            choices["scr"] = presets
+            choices["scr"]["--limit"] = one_to_hundred
+            choices["scr"]["-l"] = "--limit"
+
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def print_help(self):
@@ -90,9 +92,7 @@ class ScreenerController(BaseController):
         ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             if ns_parser.preset:
-                syncretism_view.view_available_presets(
-                    preset=ns_parser.preset, presets_path=self.presets_path
-                )
+                syncretism_view.view_available_presets(preset=ns_parser.preset)
 
             else:
                 for preset in self.preset_choices:
@@ -165,7 +165,6 @@ class ScreenerController(BaseController):
         if ns_parser:
             self.screen_tickers = syncretism_view.view_screener_output(
                 preset=ns_parser.preset,
-                presets_path=self.presets_path,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
             )

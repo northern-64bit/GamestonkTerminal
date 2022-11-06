@@ -11,9 +11,6 @@ from matplotlib import ticker
 from openbb_terminal import config_terminal as cfg
 from openbb_terminal.config_plot import PLOT_DPI
 from openbb_terminal.cryptocurrency.cryptocurrency_helpers import read_data_file
-from openbb_terminal.cryptocurrency.dataframe_helpers import (
-    lambda_replace_underscores_in_column_names,
-)
 from openbb_terminal.cryptocurrency.defi import llama_model
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.helper_funcs import (
@@ -29,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 @log_start_end(log=logger)
 def display_grouped_defi_protocols(
-    num: int = 50, export: str = "", external_axes: Optional[List[plt.Axes]] = None
+    limit: int = 50, export: str = "", external_axes: Optional[List[plt.Axes]] = None
 ) -> None:
     """Display top dApps (in terms of TVL) grouped by chain.
     [Source: https://docs.llama.fi/api]
@@ -43,8 +40,9 @@ def display_grouped_defi_protocols(
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
-    df = llama_model.get_defi_protocols(num)
-    chains = df.groupby("chain").size().index.values.tolist()
+
+    df = llama_model.get_defi_protocols(limit, drop_chain=False)
+    chains = llama_model.get_grouped_defi_protocols(limit)
 
     # This plot has 1 axis
     if not external_axes:
@@ -57,13 +55,13 @@ def display_grouped_defi_protocols(
     colors = iter(cfg.theme.get_colors(reverse=True))
 
     for chain in chains:
-        chain_filter = df.loc[df.chain == chain]
+        chain_filter = df.loc[df.Chain == chain]
         ax.barh(
             y=chain_filter.index,
-            width=chain_filter.tvl,
+            width=chain_filter["TVL ($)"],
             label=chain,
             height=0.5,
-            color=next(colors),
+            color=next(colors, "#B6A9CB"),
         )
 
     ax.set_xlabel("Total Value Locked ($)")
@@ -72,7 +70,7 @@ def display_grouped_defi_protocols(
         ticker.FuncFormatter(lambda x, _: lambda_long_number_format(x))
     )
 
-    ax.set_title(f"Top {num} dApp TVL grouped by chain")
+    ax.set_title(f"Top {limit} dApp TVL grouped by chain")
     cfg.theme.style_primary_axis(ax)
     ax.tick_params(axis="y", labelsize=8)
 
@@ -88,14 +86,14 @@ def display_grouped_defi_protocols(
         export,
         os.path.dirname(os.path.abspath(__file__)),
         "gdapps",
-        df,
+        chains,
     )
 
 
 @log_start_end(log=logger)
 def display_defi_protocols(
-    top: int,
     sortby: str,
+    limit: int = 20,
     ascend: bool = False,
     description: bool = False,
     export: str = "",
@@ -105,7 +103,7 @@ def display_defi_protocols(
 
     Parameters
     ----------
-    top: int
+    limit: int
         Number of records to display
     sortby: str
         Key by which to sort data
@@ -117,45 +115,15 @@ def display_defi_protocols(
         Export dataframe data to csv,json,xlsx file
     """
 
-    df = llama_model.get_defi_protocols()
-    df_data = df.copy()
+    df = llama_model.get_defi_protocols(limit, sortby, ascend, description)
 
-    df = df.sort_values(by=sortby, ascending=ascend)
-    df = df.drop(columns="chain")
-
-    df["tvl"] = df["tvl"].apply(lambda x: lambda_long_number_format(x))
-
-    if not description:
-        df.drop(["description", "url"], axis=1, inplace=True)
-    else:
-        df = df[
-            [
-                "name",
-                "symbol",
-                "category",
-                "description",
-                "url",
-            ]
-        ]
-
-    df.columns = [lambda_replace_underscores_in_column_names(val) for val in df.columns]
-    df.rename(
-        columns={
-            "Change 1H": "Change 1H (%)",
-            "Change 1D": "Change 1D (%)",
-            "Change 7D": "Change 7D (%)",
-            "Tvl": "TVL ($)",
-        },
-        inplace=True,
-    )
-
-    print_rich_table(df.head(top), headers=list(df.columns), show_index=False)
+    print_rich_table(df.head(limit), headers=list(df.columns), show_index=False)
 
     export_data(
         export,
         os.path.dirname(os.path.abspath(__file__)),
         "ldapps",
-        df_data,
+        df,
     )
 
 
@@ -218,7 +186,7 @@ def display_historical_tvl(
 
 @log_start_end(log=logger)
 def display_defi_tvl(
-    top: int = 5,
+    limit: int = 5,
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
@@ -227,7 +195,7 @@ def display_defi_tvl(
 
     Parameters
     ----------
-    top: int
+    limit: int
         Number of records to display, by default 5
     export : str
         Export dataframe data to csv,json,xlsx file
@@ -245,7 +213,7 @@ def display_defi_tvl(
 
     df = llama_model.get_defi_tvl()
     df_data = df.copy()
-    df = df.tail(top)
+    df = df.tail(limit)
 
     ax.plot(df["date"], df["totalLiquidityUSD"], ms=2)
     # ax.set_xlim(df["date"].iloc[0], df["date"].iloc[-1])

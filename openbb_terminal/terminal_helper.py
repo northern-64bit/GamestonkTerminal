@@ -16,6 +16,7 @@ import requests
 import matplotlib.pyplot as plt
 
 # IMPORTATION INTERNAL
+from openbb_terminal.config_terminal import LOGGING_APP_NAME, LOGGING_COMMIT_HASH
 from openbb_terminal import feature_flags as obbff
 from openbb_terminal import thought_of_the_day as thought
 from openbb_terminal.rich_config import console
@@ -87,7 +88,7 @@ def update_terminal():
     """Updates the terminal by running git pull in the directory.
     Runs poetry install if needed.
     """
-    if not WITH_GIT or obbff.LOGGING_COMMIT_HASH != "REPLACE_ME":
+    if not WITH_GIT or LOGGING_COMMIT_HASH != "REPLACE_ME":
         console.print("This feature is not available: Git dependencies not installed.")
         return 0
 
@@ -126,8 +127,6 @@ def open_openbb_documentation(
         path = "terminal/common/ba/"
     elif "qa" in path:
         path = "terminal/common/qa/"
-    elif "pred" in path:
-        path = "terminal/common/pred/"
     elif "keys" in path:
         path = "#accessing-other-sources-of-data-via-api-keys"
         command = ""
@@ -138,7 +137,7 @@ def open_openbb_documentation(
         path = f"terminal/{path}"
 
     if command:
-        if command in ["ta", "ba", "qa", "pred"]:
+        if command in ["ta", "ba", "qa"]:
             path = "terminal/common/"
         elif "keys" == command:
             path = "#accessing-other-sources-of-data-via-api-keys"
@@ -176,12 +175,23 @@ def hide_splashscreen():
         logger.info(e)
 
 
+def is_packaged_application() -> bool:
+    """Tell whether or not it is a packaged version (Windows or Mac installer).
+
+
+    Returns:
+        bool: If the application is packaged
+    """
+
+    return LOGGING_APP_NAME == "gst_packaged"
+
+
 def bootup():
     if sys.platform == "win32":
         # Enable VT100 Escape Sequence for WINDOWS 10 Ver. 1607
         os.system("")  # nosec
         # Hide splashscreen loader of the packaged app
-        if obbff.PACKAGED_APPLICATION:
+        if is_packaged_application():
             hide_splashscreen()
 
     try:
@@ -212,7 +222,7 @@ def check_for_updates() -> None:
 
     if r is not None and r.status_code == 200:
         release = r.json()["html_url"].split("/")[-1].replace("v", "")
-        if obbff.VERSION == release:
+        if obbff.VERSION.replace("m", "") == release:
             console.print("[green]You are using the latest version[/green]")
         else:
             console.print("[red]You are not using the latest version[/red]")

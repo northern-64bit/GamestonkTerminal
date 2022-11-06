@@ -7,12 +7,12 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-from prompt_toolkit.completion import NestedCompleter
+
+from openbb_terminal.custom_prompt_toolkit import NestedCompleter
 
 from openbb_terminal import feature_flags as obbff
 from openbb_terminal.common.quantitative_analysis import qa_view, rolling_view
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.cryptocurrency import cryptocurrency_helpers as c_help
 from openbb_terminal.helper_funcs import (
     EXPORT_ONLY_FIGURES_ALLOWED,
     EXPORT_ONLY_RAW_DATA_ALLOWED,
@@ -53,6 +53,8 @@ class QaController(CryptoBaseController):
         "goodness",
         "unitroot",
     ]
+    FULLER_REG = ["c", "ct", "ctt", "nc"]
+    KPS_REG = ["c", "ct"]
 
     PATH = "/crypto/qa/"
 
@@ -75,8 +77,97 @@ class QaController(CryptoBaseController):
 
         if session and obbff.USE_PROMPT_TOOLKIT:
             choices: dict = {c: {} for c in self.controller_choices}
-            choices["pick"] = {c: None for c in list(data.columns)}
-            choices["load"]["-r"] = {c: {} for c in c_help.INTERVALS}
+            choices["pick"] = {c: {} for c in list(data.columns)}
+            choices["load"] = {
+                "--interval": {
+                    c: {}
+                    for c in [
+                        "1",
+                        "5",
+                        "15",
+                        "30",
+                        "60",
+                        "240",
+                        "1440",
+                        "10080",
+                        "43200",
+                    ]
+                },
+                "-i": "--interval",
+                "--exchange": {c: {} for c in self.exchanges},
+                "--source": {c: {} for c in ["CCXT", "YahooFinance", "CoingGecko"]},
+                "--vs": {c: {} for c in ["usd", "eur"]},
+                "--start": None,
+                "-s": "--start",
+                "--end": None,
+                "-e": "--end",
+            }
+            choices["unitroot"] = {
+                "--fuller_reg": {c: {} for c in self.FULLER_REG},
+                "-r": "--fuller_reg",
+                "--kps_reg": {c: {} for c in self.KPS_REG},
+                "-k": "--kps_reg",
+            }
+            choices["line"] = {
+                "--log": {},
+                "--ml": None,
+                "--ms": None,
+            }
+            choices["hist"] = {
+                "--bins": {str(c): {} for c in range(10, 100)},
+                "-b": "--bins",
+            }
+            choices["bw"] = {
+                "--yearly": {},
+                "-y": {},
+            }
+            choices["acf"] = {
+                "--lags": {str(c): {} for c in range(5, 100)},
+                "-l": "--lags",
+            }
+            choices["rolling"] = {
+                "--window": {str(c): {} for c in range(5, 100)},
+                "-w": "--window",
+            }
+            choices["spread"] = {
+                "--window": {str(c): {} for c in range(5, 100)},
+                "-w": "--window",
+            }
+            choices["quantile"] = {
+                "--window": {str(c): {} for c in range(5, 100)},
+                "-w": "--window",
+                "--quantile": {str(c): {} for c in np.arange(0.0, 1.0, 0.01)},
+                "-q": "--quantile",
+            }
+            choices["skew"] = {
+                "--window": {str(c): {} for c in range(5, 100)},
+                "-w": "--window",
+            }
+            choices["kurtosis"] = {
+                "--window": {str(c): {} for c in range(5, 100)},
+                "-w": "--window",
+            }
+            choices["raw"] = {
+                "--limit": {str(c): {} for c in range(1, 100)},
+                "-l": "--limit",
+                "--sortby": {
+                    c: {}
+                    for c in [x.lower().replace(" ", "") for x in self.data.columns]
+                },
+                "-s": "--sortby",
+                "--descend": {},
+                "--export": {c: {} for c in ["csv", "json", "xlsx"]},
+            }
+            choices["decompose"] = {
+                "--multiplicative": None,
+                "-m": "--multiplicative",
+            }
+            choices["cusum"] = {
+                "--threshold": None,
+                "-t": "--threshold",
+                "--drift": None,
+                "-d": "--drift",
+            }
 
             choices["support"] = self.SUPPORT_CHOICES
             choices["about"] = self.ABOUT_CHOICES
@@ -173,16 +264,24 @@ class QaController(CryptoBaseController):
             dest="descend",
             help="Sort in descending order",
         )
+        parser.add_argument(
+            "-s",
+            "--sortby",
+            help="The column to sort by",
+            choices=[x.lower().replace(" ", "") for x in self.data.columns],
+            type=str.lower,
+            dest="sortby",
+        )
 
         ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             qa_view.display_raw(
-                data=self.data[self.target],
+                data=self.data,
                 limit=ns_parser.limit,
-                sortby="",
-                descend=ns_parser.descend,
+                sortby=ns_parser.sortby,
+                ascend=not ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -210,7 +309,7 @@ class QaController(CryptoBaseController):
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             add_help=False,
             prog="line",
-            description="Show line plot of selected data and allow to draw lines or highlight specific datetimes.",
+            description="Show line plot of selected data or highlight specific datetimes.",
         )
         parser.add_argument(
             "--log",
@@ -220,23 +319,15 @@ class QaController(CryptoBaseController):
             default=False,
         )
         parser.add_argument(
-            "-d",
-            "--draw",
-            help="Draw lines and annotate on the plot",
-            dest="draw",
-            action="store_true",
-            default=False,
-        )
-        parser.add_argument(
             "--ml",
-            help="Draw vertical line markers to highlight certain events",
+            help="Draw vertical line markers to highlight certain events (comma separated dates, e.g. 2020-01-01,2020-02-01)",  # noqa: E501
             dest="ml",
             type=check_list_dates,
             default="",
         )
         parser.add_argument(
             "--ms",
-            help="Draw scatter markers to highlight certain events",
+            help="Draw scatter markers to highlight certain events (comma separated dates, e.g. 2021-01-01,2021-02-01)",
             dest="ms",
             type=check_list_dates,
             default="",
@@ -250,7 +341,6 @@ class QaController(CryptoBaseController):
                 self.data[self.target],
                 title=f"{self.symbol} {self.target}",
                 log_y=ns_parser.log,
-                draw=ns_parser.draw,
                 markers_lines=ns_parser.ml,
                 markers_scatter=ns_parser.ms,
             )
@@ -673,7 +763,7 @@ class QaController(CryptoBaseController):
             "-r",
             "--fuller_reg",
             help="Type of regression.  Can be ‘c’,’ct’,’ctt’,’nc’ 'c' - Constant and t - trend order",
-            choices=["c", "ct", "ctt", "nc"],
+            choices=self.FULLER_REG,
             default="c",
             type=str,
             dest="fuller_reg",
@@ -682,7 +772,7 @@ class QaController(CryptoBaseController):
             "-k",
             "--kps_reg",
             help="Type of regression.  Can be ‘c’,’ct'",
-            choices=["c", "ct"],
+            choices=self.KPS_REG,
             type=str,
             dest="kpss_reg",
             default="c",

@@ -8,6 +8,7 @@ import pytest
 
 # IMPORTATION INTERNAL
 from openbb_terminal.stocks.technical_analysis import ta_controller
+from openbb_terminal.stocks import stocks_helper
 
 # pylint: disable=E1101
 # pylint: disable=W0603
@@ -291,27 +292,6 @@ def test_call_func_expect_queue(expected_queue, func, queue):
     "tested_func, other_args, mocked_func, called_args, called_kwargs",
     [
         (
-            "call_load",
-            [
-                "MOCK_TICKER",
-                "--start=2021-12-01",
-                "--end=2021-12-02",
-                "--interval=1",
-                "--source=YahooFinance",
-                "--prepost",
-            ],
-            "stocks_helper.load",
-            [
-                "MOCK_TICKER",
-                datetime.strptime("2021-12-01", "%Y-%m-%d"),
-                1,
-                datetime.strptime("2021-12-02", "%Y-%m-%d"),
-                True,
-                "YahooFinance",
-            ],
-            {"weekly": False, "monthly": False},
-        ),
-        (
             "call_view",
             [],
             "finviz_view.view",
@@ -359,7 +339,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
             dict(
                 ma_type="EMA",
                 symbol="MOCK_TICKER",
-                series=MOCK_STOCK_DF["Adj Close"],
+                data=MOCK_STOCK_DF["Adj Close"],
                 window=[1, 2],
                 offset=2,
                 export="csv",
@@ -377,7 +357,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
             dict(
                 ma_type="SMA",
                 symbol="MOCK_TICKER",
-                series=MOCK_STOCK_DF["Adj Close"],
+                data=MOCK_STOCK_DF["Adj Close"],
                 window=[1, 2],
                 offset=2,
                 export="csv",
@@ -395,7 +375,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
             dict(
                 ma_type="WMA",
                 symbol="MOCK_TICKER",
-                series=MOCK_STOCK_DF["Adj Close"],
+                data=MOCK_STOCK_DF["Adj Close"],
                 window=[1, 2],
                 offset=2,
                 export="csv",
@@ -413,7 +393,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
             dict(
                 ma_type="HMA",
                 symbol="MOCK_TICKER",
-                series=MOCK_STOCK_DF["Adj Close"],
+                data=MOCK_STOCK_DF["Adj Close"],
                 window=[1, 2],
                 offset=2,
                 export="csv",
@@ -430,7 +410,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
             dict(
                 symbol="MOCK_TICKER",
                 data=MOCK_STOCK_DF,
-                s_interval="MOCK_INTERVAL",
+                interval="MOCK_INTERVAL",
                 start_date=None,
                 end_date=None,
                 offset=2,
@@ -449,7 +429,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
             dict(
                 ma_type="ZLMA",
                 symbol="MOCK_TICKER",
-                series=MOCK_STOCK_DF["Adj Close"],
+                data=MOCK_STOCK_DF["Adj Close"],
                 window=[1, 2],
                 offset=2,
                 export="csv",
@@ -484,7 +464,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
             [],
             dict(
                 symbol="MOCK_TICKER",
-                series=MOCK_STOCK_DF["Adj Close"],
+                data=MOCK_STOCK_DF["Adj Close"],
                 n_fast=1,
                 n_slow=2,
                 n_signal=3,
@@ -503,7 +483,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
             [],
             dict(
                 symbol="MOCK_TICKER",
-                series=MOCK_STOCK_DF["Adj Close"],
+                data=MOCK_STOCK_DF["Adj Close"],
                 window=1,
                 scalar=2,
                 drift=3,
@@ -568,7 +548,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
             [],
             dict(
                 symbol="MOCK_TICKER",
-                series=MOCK_STOCK_DF["Adj Close"],
+                data=MOCK_STOCK_DF["Adj Close"],
                 window=1,
                 export="csv",
             ),
@@ -625,6 +605,20 @@ def test_call_func_expect_queue(expected_queue, func, queue):
                 window=1,
                 n_std=2,
                 mamode="MOCK_MAMODE",
+                export="csv",
+            ),
+        ),
+        (
+            "call_atr",
+            ["--mamode=sma", "--export=csv"],
+            "volatility_view.display_atr",
+            [],
+            dict(
+                symbol="MOCK_TICKER",
+                data=MOCK_STOCK_DF,
+                mamode="sma",
+                window=14,
+                offset=0,
                 export="csv",
             ),
         ),
@@ -726,7 +720,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
             dict(
                 symbol="MOCK_TICKER",
                 data=MOCK_STOCK_DF,
-                period=1,
+                limit=1,
                 start_date=datetime.strptime("2021-12-01", "%Y-%m-%d"),
                 end_date=datetime.strptime("2021-12-02", "%Y-%m-%d"),
                 export="csv",
@@ -775,7 +769,7 @@ def test_call_func(
 @pytest.mark.vcr
 def test_call_load(mocker):
     # FORCE SINGLE THREADING
-    yf_download = ta_controller.stocks_helper.yf.download
+    yf_download = stocks_helper.yf.download
 
     def mock_yf_download(*args, **kwargs):
         kwargs["threads"] = False

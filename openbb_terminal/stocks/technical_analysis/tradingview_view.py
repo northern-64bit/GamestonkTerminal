@@ -3,10 +3,12 @@ __docformat__ = "numpy"
 
 import logging
 import os
+import pandas as pd
 
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.helper_funcs import export_data, print_rich_table
 from openbb_terminal.stocks.technical_analysis import tradingview_model
+from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,12 @@ def print_recommendation(
     recom = tradingview_model.get_tradingview_recommendation(
         symbol, screener, exchange, interval
     )
+
+    if (isinstance(recom, pd.DataFrame) and recom.empty) or (
+        not isinstance(recom, pd.DataFrame) and not recom
+    ):
+        console.print("[red]The API did not return any recommendations.[/red]\n")
+        return
 
     export_data(
         export,
