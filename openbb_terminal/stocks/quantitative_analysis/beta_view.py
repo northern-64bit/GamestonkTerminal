@@ -22,6 +22,7 @@ def beta_view(
     ref_data: pd.DataFrame = None,
     interval: int = 1440,
     export: str = "",
+    sheet_name: str = None,
 ) -> None:
     """Display the beta scatterplot + linear regression.
 
@@ -48,7 +49,7 @@ def beta_view(
             return
         raise e
 
-    fig, ax = plt.subplots()
+    _, ax = plt.subplots()
     ax.scatter(rr, sr)  # plot returns
     ax.plot(ax.get_xlim(), [x * beta + alpha for x in ax.get_xlim()])  # plot lin reg
     ax.set(
@@ -58,7 +59,6 @@ def beta_view(
     )
     beta_text = f"Raw Beta={round(beta, 2)}\nAlpha={round(alpha, 2)}"
     ax.text(0.9, 0.1, beta_text, horizontalalignment="right", transform=ax.transAxes)
-    fig.show()
     console.print()
 
     df = pd.DataFrame({"sr": sr, "rr": rr})
@@ -68,4 +68,5 @@ def beta_view(
         os.path.dirname(os.path.abspath(__file__)),
         f"beta_alpha={alpha}_beta={beta}",
         df,
+        sheet_name,
     )

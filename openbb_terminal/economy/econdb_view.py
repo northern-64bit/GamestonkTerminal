@@ -1,7 +1,6 @@
 """ EconDB View """
 __docformat__ = "numpy"
 # pylint:disable=too-many-arguments
-from datetime import datetime
 import logging
 import os
 from textwrap import fill
@@ -28,11 +27,12 @@ def show_macro_data(
     countries: list = None,
     transform: str = "",
     start_date: str = "1900-01-01",
-    end_date: str = str(datetime.today().date()),
+    end_date: Optional[str] = None,
     symbol: str = "",
     raw: bool = False,
     external_axes: Optional[List[plt.axes]] = None,
     export: str = "",
+    sheet_name: str = None,
 ):
     """Show the received macro data about a company [Source: EconDB]
 
@@ -52,7 +52,7 @@ def show_macro_data(
             'TNOR' - Start = 100
     start_date : str
         The starting date, format "YEAR-MONTH-DAY", i.e. 2010-12-31.
-    end_date : str
+    end_date : Optional[str]
         The end date, format "YEAR-MONTH-DAY", i.e. 2020-06-05.
     symbol : str
         In what currency you wish to convert all values.
@@ -64,7 +64,7 @@ def show_macro_data(
         Export data to csv,json,xlsx or png,jpg,pdf,svg file
 
     Returns
-    ----------
+    -------
     Plots the Series.
     """
 
@@ -120,7 +120,6 @@ def show_macro_data(
     df_rounded.columns = ["_".join(column) for column in df_rounded.columns]
 
     if raw:
-
         print_rich_table(
             df_rounded.fillna("-").iloc[-10:],
             headers=list(df_rounded.columns),
@@ -134,6 +133,7 @@ def show_macro_data(
             os.path.dirname(os.path.abspath(__file__)),
             "macro_data",
             df_rounded,
+            sheet_name,
         )
 
     theme.style_primary_axis(ax)
@@ -148,10 +148,11 @@ def show_treasuries(
     maturities: list = None,
     frequency: str = "monthly",
     start_date: str = "1900-01-01",
-    end_date: str = str(datetime.today().date()),
+    end_date: Optional[str] = None,
     raw: bool = False,
     external_axes: Optional[List[plt.axes]] = None,
     export: str = "",
+    sheet_name: str = None,
 ):
     """Display U.S. Treasury rates [Source: EconDB]
 
@@ -166,7 +167,7 @@ def show_treasuries(
         Frequency of the data, this can be daily, weekly, monthly or annually
     start_date : str
         Starting date, format "YEAR-MONTH-DAY", i.e. 2010-12-31.
-    end_date : str
+    end_date : Optional[str]
         End date, format "YEAR-MONTH-DAY", i.e. 2020-06-05.
     raw : bool
         Whether to display the raw output.
@@ -176,7 +177,7 @@ def show_treasuries(
         Export data to csv,json,xlsx or png,jpg,pdf,svg file
 
     Returns
-    ----------
+    -------
     Plots the Treasury Series.
     """
 
@@ -215,7 +216,6 @@ def show_treasuries(
         theme.visualize_output()
 
     if raw:
-
         print_rich_table(
             treasury_data.iloc[-10:],
             headers=list(treasury_data.columns),
@@ -229,6 +229,7 @@ def show_treasuries(
             os.path.dirname(os.path.abspath(__file__)),
             "treasuries_data",
             treasury_data,
+            sheet_name,
         )
 
 
@@ -237,7 +238,7 @@ def show_treasury_maturities():
     """Get treasury maturity options [Source: EconDB]
 
     Returns
-    ----------
+    -------
     A table containing the instruments and maturities.
     """
 

@@ -13,7 +13,6 @@ from openbb_terminal.cryptocurrency.due_diligence import coinpaprika_model
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.helper_funcs import export_data, print_rich_table
 from openbb_terminal.rich_config import console
-from openbb_terminal.cryptocurrency import cryptocurrency_helpers
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +89,9 @@ def display_twitter(
     sortby: str = "date",
     ascend: bool = True,
     export: str = "",
+    sheet_name: str = None,
 ) -> None:
-    """Get twitter timeline for given coin id. Not more than last 50 tweets [Source: CoinPaprika]
+    """Prints table showing twitter timeline for given coin id. Not more than last 50 tweets [Source: CoinPaprika]
 
     Parameters
     ----------
@@ -108,11 +108,7 @@ def display_twitter(
     export : str
         Export dataframe data to csv,json,xlsx file
     """
-
-    # get coinpaprika id using crypto symbol
-    cp_id = cryptocurrency_helpers.get_coinpaprika_id(symbol)
-
-    df = coinpaprika_model.get_coin_twitter_timeline(cp_id, sortby, ascend)
+    df = coinpaprika_model.get_coin_twitter_timeline(symbol, sortby, ascend)
 
     if df.empty:
         console.print(f"Couldn't find any tweets for coin {symbol}", "\n")
@@ -130,6 +126,7 @@ def display_twitter(
         os.path.dirname(os.path.abspath(__file__)),
         "twitter",
         df,
+        sheet_name,
     )
 
 
@@ -141,8 +138,9 @@ def display_events(
     ascend: bool = False,
     links: bool = False,
     export: str = "",
+    sheet_name: str = None,
 ) -> None:
-    """Get all events for given coin id. [Source: CoinPaprika]
+    """Prints table showing all events for given coin id. [Source: CoinPaprika]
 
     Parameters
     ----------
@@ -161,10 +159,7 @@ def display_events(
     export : str
         Export dataframe data to csv,json,xlsx file
     """
-    # get coinpaprika id using crypto symbol
-    cp_id = cryptocurrency_helpers.get_coinpaprika_id(symbol)
-
-    df = coinpaprika_model.get_coin_events_by_id(cp_id, sortby, ascend)
+    df = coinpaprika_model.get_coin_events_by_id(symbol, sortby, ascend)
 
     if df.empty:
         console.print(f"Couldn't find any events for coin {symbol}\n")
@@ -186,6 +181,7 @@ def display_events(
         os.path.dirname(os.path.abspath(__file__)),
         "events",
         df_data,
+        sheet_name,
     )
 
 
@@ -196,8 +192,9 @@ def display_exchanges(
     sortby: str = "adjusted_volume_24h_share",
     ascend: bool = True,
     export: str = "",
+    sheet_name: str = None,
 ) -> None:
-    """Get all exchanges for given coin id. [Source: CoinPaprika]
+    """Prints table showing all exchanges for given coin id. [Source: CoinPaprika]
 
     Parameters
     ----------
@@ -213,11 +210,7 @@ def display_exchanges(
     export : str
         Export dataframe data to csv,json,xlsx file
     """
-
-    # get coinpaprika id using crypto symbol
-    cp_id = cryptocurrency_helpers.get_coinpaprika_id(symbol)
-
-    df = coinpaprika_model.get_coin_exchanges_by_id(cp_id, sortby, ascend)
+    df = coinpaprika_model.get_coin_exchanges_by_id(symbol, sortby, ascend)
 
     if df.empty:
         console.print("No data found", "\n")
@@ -235,6 +228,7 @@ def display_exchanges(
         os.path.dirname(os.path.abspath(__file__)),
         "ex",
         df,
+        sheet_name,
     )
 
 
@@ -247,8 +241,9 @@ def display_markets(
     ascend: bool = True,
     links: bool = False,
     export: str = "",
+    sheet_name: str = None,
 ) -> None:
-    """Get all markets for given coin id. [Source: CoinPaprika]
+    """Prints table showing all markets for given coin id. [Source: CoinPaprika]
 
     Parameters
     ----------
@@ -268,14 +263,9 @@ def display_markets(
     export : str
         Export dataframe data to csv,json,xlsx file
     """
-
-    if sortby in ["volume", "price"]:
-        sortby = f"{str(to_symbol).lower()}_{sortby}"
-
-    # get coinpaprika id using crypto symbol
-    cp_id = cryptocurrency_helpers.get_coinpaprika_id(from_symbol)
-
-    df = coinpaprika_model.get_coin_markets_by_id(cp_id, to_symbol, sortby, ascend)
+    df = coinpaprika_model.get_coin_markets_by_id(
+        from_symbol, to_symbol, sortby, ascend
+    )
 
     if df.empty:
         console.print("There is no data \n")
@@ -297,6 +287,7 @@ def display_markets(
         os.path.dirname(os.path.abspath(__file__)),
         "mkt",
         df_data,
+        sheet_name,
     )
 
 
@@ -305,8 +296,9 @@ def display_price_supply(
     from_symbol: str = "BTC",
     to_symbol: str = "USD",
     export: str = "",
+    sheet_name: str = None,
 ) -> None:
-    """Get ticker information for single coin [Source: CoinPaprika]
+    """Prints table showing ticker information for single coin [Source: CoinPaprika]
 
     Parameters
     ----------
@@ -314,14 +306,13 @@ def display_price_supply(
         Cryptocurrency symbol (e.g. BTC)
     to_symbol: str
         Quoted currency
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Export dataframe data to csv,json,xlsx
 
     """
-    # get coinpaprika id using crypto symbol
-    cp_id = cryptocurrency_helpers.get_coinpaprika_id(from_symbol)
-
-    df = coinpaprika_model.get_tickers_info_for_coin(cp_id, to_symbol)
+    df = coinpaprika_model.get_tickers_info_for_coin(from_symbol, to_symbol)
 
     if df.empty:
         console.print("No data found", "\n")
@@ -338,6 +329,7 @@ def display_price_supply(
         os.path.dirname(os.path.abspath(__file__)),
         "ps",
         df,
+        sheet_name,
     )
 
 
@@ -345,8 +337,9 @@ def display_price_supply(
 def display_basic(
     symbol: str = "BTC",
     export: str = "",
+    sheet_name: str = None,
 ) -> None:
-    """Get basic information for coin. Like:
+    """Prints table showing basic information for coin. Like:
         name, symbol, rank, type, description, platform, proof_type, contract, tags, parent.
         [Source: CoinPaprika]
 
@@ -354,13 +347,12 @@ def display_basic(
     ----------
     symbol: str
         Cryptocurrency symbol (e.g. BTC)
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Export dataframe data to csv,json,xlsx
     """
-    # get coinpaprika id using crypto symbol
-    cp_id = cryptocurrency_helpers.get_coinpaprika_id(symbol)
-
-    df = coinpaprika_model.basic_coin_info(cp_id)
+    df = coinpaprika_model.basic_coin_info(symbol)
 
     if df.empty:
         console.print("No data available\n")
@@ -375,4 +367,5 @@ def display_basic(
         os.path.dirname(os.path.abspath(__file__)),
         "basic",
         df,
+        sheet_name,
     )

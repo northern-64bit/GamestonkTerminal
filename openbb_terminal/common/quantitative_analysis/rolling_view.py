@@ -18,7 +18,6 @@ from openbb_terminal.helper_funcs import (
     reindex_dates,
     is_valid_axes_count,
 )
-from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +29,10 @@ def display_mean_std(
     symbol: str = "",
     window: int = 14,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
-    """View mean std deviation
+    """Plots mean std deviation
 
     Parameters
     ----------
@@ -44,6 +44,8 @@ def display_mean_std(
         Stock ticker
     window : int
         Length of window
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     external_axes: Optional[List[plt.Axes]], optional
@@ -129,6 +131,7 @@ def display_mean_std(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "rolling",
         rolling_mean.join(rolling_std, lsuffix="_mean", rsuffix="_std"),
+        sheet_name,
     )
 
 
@@ -139,9 +142,10 @@ def display_spread(
     symbol: str = "",
     window: int = 14,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """View rolling spread
+    """Plots rolling spread
 
     Parameters
     ----------
@@ -155,6 +159,8 @@ def display_spread(
         Stock ticker
     window : int
         Length of window
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     external_axes: Optional[List[plt.Axes]], optional
@@ -239,6 +245,7 @@ def display_spread(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "spread",
         df_sd.join(df_var, lsuffix="_sd", rsuffix="_var"),
+        sheet_name,
     )
 
 
@@ -250,9 +257,10 @@ def display_quantile(
     window: int = 14,
     quantile: float = 0.5,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
-    """View rolling quantile
+    """Plots rolling quantile
 
     Parameters
     ----------
@@ -266,6 +274,8 @@ def display_quantile(
         Length of window
     quantile: float
         Quantile to get
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     external_axes: Optional[List[plt.Axes]], optional
@@ -335,6 +345,7 @@ def display_quantile(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "quantile",
         df_med.join(df_quantile),
+        sheet_name,
     )
 
 
@@ -345,9 +356,10 @@ def display_skew(
     target: str,
     window: int = 14,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
-    """View rolling skew
+    """Plots rolling skew
 
     Parameters
     ----------
@@ -359,6 +371,8 @@ def display_skew(
         Column in data to look at
     window: int
         Length of window
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     external_axes: Optional[List[plt.Axes]], optional
@@ -413,12 +427,12 @@ def display_skew(
     if external_axes is None:
         theme.visualize_output()
 
-    console.print("")
     export_data(
         export,
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "skew",
         df_skew,
+        sheet_name,
     )
 
 
@@ -429,9 +443,10 @@ def display_kurtosis(
     target: str,
     window: int = 14,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """View rolling kurtosis
+    """Plots rolling kurtosis
 
     Parameters
     ----------
@@ -443,6 +458,8 @@ def display_kurtosis(
         Column in data to look at
     window: int
         Length of window
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     external_axes: Optional[List[plt.Axes]], optional
@@ -500,10 +517,10 @@ def display_kurtosis(
     if external_axes is None:
         theme.visualize_output()
 
-    console.print("")
     export_data(
         export,
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "kurtosis",
         df_kurt,
+        sheet_name,
     )

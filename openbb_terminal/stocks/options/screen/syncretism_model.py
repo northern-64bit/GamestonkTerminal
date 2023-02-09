@@ -7,11 +7,11 @@ from pathlib import Path
 from typing import Dict, Tuple, Union
 
 import pandas as pd
-import requests
 import yfinance as yf
 
-from openbb_terminal.decorators import log_start_end
+from openbb_terminal.helper_funcs import request
 from openbb_terminal.core.config.paths import USER_PRESETS_DIRECTORY
+from openbb_terminal.decorators import log_start_end
 from openbb_terminal.rich_config import console
 from openbb_terminal.stocks.options import yfinance_model
 
@@ -84,7 +84,7 @@ def get_historical_greeks(
             console.print(f"[red]Strike price of {strike} not found.[/red]\n")
             return pd.DataFrame()
 
-    r = requests.get(f"https://api.syncretism.io/ops/historical/{chain_id}")
+    r = request(f"https://api.syncretism.io/ops/historical/{chain_id}")
 
     if r.status_code != 200:
         console.print("Error in request.")
@@ -163,12 +163,11 @@ def get_screener_output(preset: str) -> Tuple[pd.DataFrame, str]:
     ----------
     preset: str
         Chosen preset
+
     Returns
     -------
-    pd.DataFrame:
-        DataFrame with screener data, or empty if errors
-    str:
-        String containing error message if supplied
+    Tuple[pd.DataFrame, str]
+        DataFrame with screener data or empty if errors, String containing error message if supplied
     """
     d_cols = {
         "contractSymbol": "CS",
@@ -219,9 +218,7 @@ def get_screener_output(preset: str) -> Tuple[pd.DataFrame, str]:
 
     link = "https://api.syncretism.io/ops"
 
-    res = requests.get(
-        link, headers={"Content-type": "application/json"}, data=s_filters
-    )
+    res = request(link, headers={"Content-type": "application/json"}, data=s_filters)
 
     # pylint:disable=no-else-return
     if res.status_code == 200:
@@ -256,6 +253,7 @@ def check_presets(preset_dict: dict) -> str:
     ----------
     preset_dict: dict
         Defined presets from configparser
+
     Returns
     -------
     error: str

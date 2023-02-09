@@ -21,15 +21,14 @@ from openbb_terminal.helper_funcs import (
     plot_autoscale,
     is_valid_axes_count,
 )
-from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
 
 
 @log_start_end(log=logger)
 @check_api_key(["API_COINGLASS_KEY"])
-def display_funding_rate(symbol: str, export: str = "") -> None:
-    """Displays funding rate by exchange for a certain cryptocurrency
+def display_funding_rate(symbol: str, export: str = "", sheet_name: str = None) -> None:
+    """Plots funding rate by exchange for a certain cryptocurrency
     [Source: https://coinglass.github.io/API-Reference/]
 
     Parameters
@@ -43,20 +42,22 @@ def display_funding_rate(symbol: str, export: str = "") -> None:
         return
 
     plot_data(df, symbol, f"Exchange {symbol} Funding Rate", "Funding Rate [%]")
-    console.print("")
 
     export_data(
         export,
         os.path.dirname(os.path.abspath(__file__)),
         "fundrate",
         df,
+        sheet_name,
     )
 
 
 @log_start_end(log=logger)
 @check_api_key(["API_COINGLASS_KEY"])
-def display_open_interest(symbol: str, interval: int = 0, export: str = "") -> None:
-    """Displays open interest by exchange for a certain cryptocurrency
+def display_open_interest(
+    symbol: str, interval: int = 0, export: str = "", sheet_name: str = None
+) -> None:
+    """Plots open interest by exchange for a certain cryptocurrency
     [Source: https://coinglass.github.io/API-Reference/]
 
     Parameters
@@ -77,20 +78,20 @@ def display_open_interest(symbol: str, interval: int = 0, export: str = "") -> N
         f"Exchange {symbol} Futures Open Interest",
         "Open futures value [$B]",
     )
-    console.print("")
 
     export_data(
         export,
         os.path.dirname(os.path.abspath(__file__)),
         "oi",
         df,
+        sheet_name,
     )
 
 
 @log_start_end(log=logger)
 @check_api_key(["API_COINGLASS_KEY"])
-def display_liquidations(symbol: str, export: str = "") -> None:
-    """Displays liquidation per day data for a certain cryptocurrency
+def display_liquidations(symbol: str, export: str = "", sheet_name: str = None) -> None:
+    """Plots liquidation per day data for a certain cryptocurrency
     [Source: https://coinglass.github.io/API-Reference/#liquidation-chart]
 
     Parameters
@@ -109,13 +110,13 @@ def display_liquidations(symbol: str, export: str = "") -> None:
         f"Total liquidations for {symbol}",
         "Liquidations value [$M]",
     )
-    console.print("")
 
     export_data(
         export,
         os.path.dirname(os.path.abspath(__file__)),
         "liquidations",
         df,
+        sheet_name,
     )
 
 
@@ -127,7 +128,6 @@ def plot_data(
     ylabel: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-
     # This plot has 2 axes
     if not external_axes:
         _, axes = plt.subplots(
@@ -179,7 +179,6 @@ def plot_data_bar(
     ylabel: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-
     # This plot has 2 axes
     if not external_axes:
         _, axes = plt.subplots(

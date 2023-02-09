@@ -9,11 +9,7 @@ from tests.openbb_terminal.forecast import conftest
 @pytest.mark.parametrize("file_type", ["csv", "xlsx", "swp", "juan"])
 def test_load(file_type):
     path = conftest.create_path("forecast", "data", f"TSLA.{file_type}")
-    if not file_type == "xlsx":
-        common_model.load("TSLA", file_type, {"TSLA": path})
-    else:
-        with pytest.raises(ValueError):
-            common_model.load("TSLA", file_type, {"TSLA": path})
+    common_model.load(file_type, {"TSLA": path})
 
 
 @pytest.mark.parametrize("name", ["data", None])
@@ -42,7 +38,7 @@ def test_clean(tsla_csv, fill, drop):
 def test_add_feature_engineering(tsla_csv, command):
     val = getattr(fm, f"add_{command}")(tsla_csv)
     if command == "atr":
-        assert isinstance(val, Tuple)
+        assert isinstance(val, (pd.DataFrame, Tuple))
     else:
         assert isinstance(val, pd.DataFrame)
 

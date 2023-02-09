@@ -34,25 +34,27 @@ def test_get_search_futures(recorder, category):
 
 @pytest.mark.vcr
 @pytest.mark.parametrize(
-    "tickers",
+    "symbols",
     [
         ["BLK"],
     ],
 )
-def test_get_historical_futures(recorder, tickers):
-    result = yfinance_model.get_historical_futures(tickers)
+def test_get_historical_futures(recorder, symbols):
+    result = yfinance_model.get_historical_futures(
+        symbols, start_date="2022-01-01", end_date="2023-01-01"
+    )
 
     recorder.capture(result)
 
 
 @pytest.mark.vcr
 @pytest.mark.parametrize(
-    "ticker",
+    "symbol",
     [
         ["ES"],
     ],
 )
-def test_get_curve_futures(recorder, ticker):
-    result = yfinance_model.get_curve_futures(ticker)
+def test_get_curve_futures(recorder, symbol):
+    result = yfinance_model.get_curve_futures(symbol)
 
     recorder.capture(result)

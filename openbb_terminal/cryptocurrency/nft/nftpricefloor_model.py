@@ -4,8 +4,8 @@ import logging
 from typing import List
 
 import pandas as pd
-import requests
 
+from openbb_terminal.helper_funcs import request
 from openbb_terminal.decorators import log_start_end
 
 logger = logging.getLogger(__name__)
@@ -16,8 +16,8 @@ API_URL = "https://api-bff.nftpricefloor.com"
 def get_collection_slugs() -> List[str]:
     df = get_collections()
     if not df.empty and "slug" in df.columns:
-        return df["slug"].values
-    return pd.DataFrame()
+        return df["slug"].tolist()
+    return []
 
 
 @log_start_end(log=logger)
@@ -25,14 +25,14 @@ def get_collections() -> pd.DataFrame:
     """Get nft collections [Source: https://nftpricefloor.com/]
 
     Parameters
-    -------
+    ----------
 
     Returns
     -------
     pd.DataFrame
         nft collections
     """
-    res = requests.get(f"{API_URL}/projects")
+    res = request(f"{API_URL}/projects")
     if res.status_code == 200:
         data = res.json()
         df = pd.DataFrame(data)
@@ -43,11 +43,11 @@ def get_collections() -> pd.DataFrame:
 
 
 @log_start_end(log=logger)
-def get_floor_price(slug) -> pd.DataFrame:
+def get_floor_price(slug: str) -> pd.DataFrame:
     """Get nft collections [Source: https://nftpricefloor.com/]
 
     Parameters
-    -------
+    ----------
     slug: str
         nft collection slug
 
@@ -56,7 +56,7 @@ def get_floor_price(slug) -> pd.DataFrame:
     pd.DataFrame
         nft collections
     """
-    res = requests.get(f"{API_URL}/projects/{slug}/charts/all")
+    res = request(f"{API_URL}/projects/{slug}/charts/all")
     if res.status_code == 200:
         data = res.json()
         df = pd.DataFrame(

@@ -7,49 +7,48 @@ __docformat__ = "numpy"
 
 import logging
 import os
-from datetime import datetime, timedelta, date
-from typing import Any, Union, Optional, Iterable, List, Dict
+from datetime import datetime, timedelta
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 import financedatabase as fd
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-from matplotlib.ticker import LogLocator, ScalarFormatter
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import pytz
-import requests
-from requests.exceptions import ReadTimeout
-
 import yfinance as yf
+from matplotlib.lines import Line2D
+from matplotlib.ticker import LogLocator, ScalarFormatter
 from plotly.subplots import make_subplots
+from requests.exceptions import ReadTimeout
 from scipy import stats
 
 from openbb_terminal import config_terminal as cfg
+from openbb_terminal.helper_funcs import (
+    export_data,
+    lambda_long_number_format_y_axis,
+    plot_autoscale,
+    print_rich_table,
+    request,
+)
+from openbb_terminal.rich_config import console
 
 # pylint: disable=unused-import
-from openbb_terminal.stocks.stock_statics import market_coverage_suffix
+from openbb_terminal.stocks.stock_statics import BALANCE_PLOT  # noqa: F401
+from openbb_terminal.stocks.stock_statics import CANDLE_SORT  # noqa: F401
+from openbb_terminal.stocks.stock_statics import CASH_PLOT  # noqa: F401
+from openbb_terminal.stocks.stock_statics import INCOME_PLOT  # noqa: F401
 from openbb_terminal.stocks.stock_statics import INTERVALS  # noqa: F401
 from openbb_terminal.stocks.stock_statics import SOURCES  # noqa: F401
-from openbb_terminal.stocks.stock_statics import INCOME_PLOT  # noqa: F401
-from openbb_terminal.stocks.stock_statics import BALANCE_PLOT  # noqa: F401
-from openbb_terminal.stocks.stock_statics import CASH_PLOT  # noqa: F401
-from openbb_terminal.stocks.stock_statics import CANDLE_SORT  # noqa: F401
-from openbb_terminal.stocks.stocks_models import (
+from openbb_terminal.stocks.stock_statics import market_coverage_suffix
+from openbb_terminal.stocks.stocks_model import (
     load_stock_av,
-    load_stock_yf,
     load_stock_eodhd,
     load_stock_iex_cloud,
     load_stock_polygon,
+    load_stock_yf,
 )
-from openbb_terminal.helper_funcs import (
-    export_data,
-    plot_autoscale,
-    print_rich_table,
-    lambda_long_number_format_y_axis,
-)
-from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
 
@@ -61,14 +60,50 @@ exchange_df = pd.read_csv(exch_file_path, index_col=0, header=None)
 exchange_mappings = exchange_df.squeeze("columns").to_dict()
 
 
+def check_datetime(
+    ck_date: Optional[Union[datetime, str]] = None, start: bool = True
+) -> datetime:
+    """Checks if given argument is string and attempts to convert to datetime.
+
+    Parameters
+    ----------
+    ck_date : Optional[Union[datetime, str]], optional
+        Date to check, by default None
+    start : bool, optional
+        If True and string is invalid, will return 1100 days ago
+        If False and string is invalid, will return today, by default True
+
+    Returns
+    -------
+    datetime
+        Datetime object
+    """
+    error_catch = (datetime.now() - timedelta(days=1100)) if start else datetime.now()
+    try:
+        if ck_date is None:
+            return error_catch
+        if isinstance(ck_date, datetime):
+            return ck_date
+        if isinstance(ck_date, str):
+            return datetime.strptime(ck_date, "%Y-%m-%d")
+    except Exception:
+        console.print(
+            f"Invalid date format (YYYY-MM-DD), "
+            f"Using {error_catch.strftime('%Y-%m-%d')} for {ck_date}"
+        )
+    return error_catch
+
+
 def search(
     query: str = "",
     country: str = "",
     sector: str = "",
     industry: str = "",
     exchange_country: str = "",
+    all_exchanges: bool = False,
     limit: int = 0,
     export: str = "",
+    sheet_name: Optional[str] = "",
 ) -> None:
     """Search selected query for tickers.
 
@@ -84,10 +119,17 @@ def search(
         Search by industry to find stocks matching the criteria
     exchange_country: str
         Search by exchange country to find stock matching
+    all_exchanges: bool
+       Whether to search all exchanges, without this option only the United States market is searched
     limit : int
         The limit of companies shown.
     export : str
         Export data
+
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> openbb.stocks.search(country="united states", exchange_country="Germany")
     """
     kwargs: Dict[str, Any] = {"exclude_exchanges": False}
     if country:
@@ -96,6 +138,7 @@ def search(
         kwargs["sector"] = sector
     if industry:
         kwargs["industry"] = industry
+    kwargs["exclude_exchanges"] = False if exchange_country else not all_exchanges
 
     try:
         data = fd.select_equities(**kwargs)
@@ -119,6 +162,15 @@ def search(
         d = fd.search_products(
             data, query, search="long_name", case_sensitive=False, new_database=None
         )
+        d.update(
+            fd.search_products(
+                data,
+                query,
+                search="short_name",
+                case_sensitive=False,
+                new_database=None,
+            )
+        )
     else:
         d = data
 
@@ -126,7 +178,9 @@ def search(
         console.print("No companies found.\n")
         return
 
-    df = pd.DataFrame.from_dict(d).T[["long_name", "country", "sector", "industry"]]
+    df = pd.DataFrame.from_dict(d).T[
+        ["long_name", "short_name", "country", "sector", "industry", "exchange"]
+    ]
     if exchange_country:
         if exchange_country in market_coverage_suffix:
             suffix_tickers = [
@@ -145,10 +199,8 @@ def search(
         for x in v:
             exchange_suffix[x] = k
 
-    df["exchange"] = [
-        exchange_suffix.get(ticker.split(".")[1]) if "." in ticker else "USA"
-        for ticker in list(df.index)
-    ]
+    df["name"] = df["long_name"].combine_first(df["short_name"])
+    df = df[["name", "country", "sector", "industry", "exchange"]]
 
     title = "Companies found"
     if query:
@@ -164,12 +216,8 @@ def search(
     if not sector and industry:
         title += f" within {industry}"
 
-    df["exchange"] = df["exchange"].apply(
-        lambda x: x.replace("_", " ").title() if x else None
-    )
-    df["exchange"] = df["exchange"].apply(
-        lambda x: "United States" if x == "Usa" else None
-    )
+    df = df.fillna(value=np.nan)
+    df = df.iloc[df.isnull().sum(axis=1).mul(1).argsort()]
 
     print_rich_table(
         df.iloc[:limit] if limit else df,
@@ -178,14 +226,20 @@ def search(
         title=title,
     )
 
-    export_data(export, os.path.dirname(os.path.abspath(__file__)), "search", df)
+    export_data(
+        export,
+        os.path.dirname(os.path.abspath(__file__)),
+        "search",
+        df,
+        sheet_name,
+    )
 
 
 def load(
     symbol: str,
-    start_date: datetime = None,
+    start_date: Optional[Union[datetime, str]] = None,
     interval: int = 1440,
-    end_date: datetime = None,
+    end_date: Optional[Union[datetime, str]] = None,
     prepost: bool = False,
     source: str = "YahooFinance",
     iexrange: str = "ytd",
@@ -227,12 +281,12 @@ def load(
     ----------
     symbol: str
         Ticker to get data
-    start_date: datetime
-        Start date to get data from with
+    start_date: str or datetime, optional
+        Start date to get data from with. - datetime or string format (YYYY-MM-DD)
     interval: int
         Interval (in minutes) to get data 1, 5, 15, 30, 60 or 1440
-    end_date: datetime
-        End date to get data from with
+    end_date: str or datetime, optional
+        End date to get data from with. - datetime or string format (YYYY-MM-DD)
     prepost: bool
         Pre and After hours data
     source: str
@@ -251,22 +305,25 @@ def load(
     df_stock_candidate: pd.DataFrame
         Dataframe of data
     """
+
     if start_date is None:
-        start_date = datetime.now() - timedelta(days=1100)
+        start_date = (datetime.now() - timedelta(days=1100)).strftime("%Y-%m-%d")
+
     if end_date is None:
-        end_date = datetime.now()
+        end_date = datetime.now().strftime("%Y-%m-%d")
+
+    start_date = check_datetime(start_date)
+    end_date = check_datetime(end_date, start=False)
+    int_string = "Daily"
+    if weekly:
+        int_string = "Weekly"
+    if monthly:
+        int_string = "Monthly"
 
     # Daily
     if int(interval) == 1440:
-
-        int_string = "Daily"
-        if weekly:
-            int_string = "Weekly"
-        if monthly:
-            int_string = "Monthly"
-
         if source == "AlphaVantage":
-            df_stock_candidate = load_stock_av(symbol, start_date, end_date)
+            df_stock_candidate = load_stock_av(symbol, int_string, start_date, end_date)
 
         elif source == "YahooFinance":
             df_stock_candidate = load_stock_yf(
@@ -288,17 +345,26 @@ def load(
         else:
             console.print("[red]Invalid source for stock[/red]\n")
             return
-        if df_stock_candidate.empty:
-            return df_stock_candidate
+        is_df = isinstance(df_stock_candidate, pd.DataFrame)
+        if (is_df and df_stock_candidate.empty) or (
+            not is_df and not df_stock_candidate
+        ):
+            return pd.DataFrame()
 
         df_stock_candidate.index.name = "date"
         s_start = df_stock_candidate.index[0]
         s_interval = f"{interval}min"
-        int_string = "Daily" if interval == 1440 else "Intraday"
 
     else:
+        if source == "AlphaVantage":
+            s_start = start_date
+            int_string = "Minute"
+            s_interval = f"{interval}min"
+            df_stock_candidate = load_stock_av(
+                symbol, int_string, start_date, end_date, s_interval
+            )
 
-        if source == "YahooFinance":
+        elif source == "YahooFinance":
             s_int = str(interval) + "m"
             s_interval = s_int + "in"
             d_granularity = {"1m": 6, "5m": 59, "15m": 59, "30m": 59, "60m": 729}
@@ -336,7 +402,7 @@ def load(
                 f"/{end_date.strftime('%Y-%m-%d')}"
                 f"?adjusted=true&sort=desc&limit=49999&apiKey={cfg.API_POLYGON_KEY}"
             )
-            r = requests.get(request_url)
+            r = request(request_url)
             if r.status_code != 200:
                 console.print("[red]Error in polygon request[/red]")
                 return pd.DataFrame()
@@ -385,7 +451,7 @@ def load(
             s_interval = f"{interval}min"
         int_string = "Intraday"
 
-    s_intraday = (f"Intraday {s_interval}", int_string)[interval == 1440]
+    s_intraday = (f"Intraday {interval}min", int_string)[interval == 1440]
 
     if verbose:
         console.print(
@@ -404,9 +470,9 @@ def display_candle(
     add_trend: bool = False,
     ma: Optional[Iterable[int]] = None,
     asset_type: str = "",
-    start_date: datetime = (datetime.now() - timedelta(days=1100)),
+    start_date: Optional[Union[datetime, str]] = None,
     interval: int = 1440,
-    end_date: datetime = datetime.now(),
+    end_date: Optional[Union[datetime, str]] = None,
     prepost: bool = False,
     source: str = "YahooFinance",
     iexrange: str = "ytd",
@@ -440,12 +506,12 @@ def display_candle(
         External axes (2 axes are expected in the list), by default None
     asset_type_: str
         String to include in title
-    start_date: datetime
-        Start date to get data from with
+    start_date: str or datetime, optional
+        Start date to get data from with. - datetime or string format (YYYY-MM-DD)
     interval: int
         Interval (in minutes) to get data 1, 5, 15, 30, 60 or 1440
-    end_date: datetime
-        End date to get data from with
+    end_date: str or datetime, optional
+        End date to get data from with. - datetime or string format (YYYY-MM-DD)
     prepost: bool
         Pre and After hours data
     source: str
@@ -460,7 +526,22 @@ def display_candle(
         Flag to display raw data, by default False
     yscale: str
         Linear or log for yscale
+
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> openbb.stocks.candle("AAPL")
     """
+
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=1100)).strftime("%Y-%m-%d")
+
+    if end_date is None:
+        end_date = datetime.now().strftime("%Y-%m-%d")
+
+    start_date = check_datetime(start_date)
+    end_date = check_datetime(end_date, start=False)
+
     if data is None:
         data = load(
             symbol,
@@ -721,7 +802,9 @@ def display_candle(
 
 
 def load_ticker(
-    ticker: str, start_date: Union[str, datetime], end_date: Union[str, datetime] = ""
+    ticker: str,
+    start_date: Union[str, datetime],
+    end_date: Optional[Union[str, datetime]] = None,
 ) -> pd.DataFrame:
     """Load a ticker data from Yahoo Finance.
 
@@ -741,13 +824,18 @@ def load_ticker(
     DataFrame
         A Panda's data frame with columns Open, High, Low, Close, Adj Close, Volume,
         date_id, OC-High, OC-Low.
+
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> msft_df = openbb.stocks.load("MSFT")
     """
-    if end_date:
-        df_data = yf.download(ticker, start=start_date, end=end_date, progress=False)
-    else:
-        df_data = yf.download(ticker, start=start_date, progress=False)
+    df_data = yf.download(
+        ticker, start=start_date, end=end_date, progress=False, ignore_tz=True
+    )
 
     df_data.index = pd.to_datetime(df_data.index)
+
     df_data["date_id"] = (df_data.index.date - df_data.index.date.min()).astype(
         "timedelta64[D]"
     )
@@ -863,22 +951,19 @@ def additional_info_about_ticker(ticker: str) -> str:
         if ".US" in ticker.upper():
             ticker = ticker.rstrip(".US")
             ticker = ticker.rstrip(".us")
-        ticker_info = yf.Ticker(ticker).info
+        ticker_stats = yf.Ticker(ticker).stats()
         extra_info += "\n[param]Company:  [/param]"
-        if "shortName" in ticker_info and ticker_info["shortName"]:
-            extra_info += ticker_info["shortName"]
+        extra_info += ticker_stats.get("quoteType", {}).get("shortName")
         extra_info += "\n[param]Exchange: [/param]"
-        if "exchange" in ticker_info and ticker_info["exchange"]:
-            exchange_name = ticker_info["exchange"]
-            extra_info += (
-                exchange_mappings["X" + exchange_name]
-                if "X" + exchange_name in exchange_mappings
-                else exchange_name
-            )
+        exchange_name = ticker_stats.get("quoteType", {}).get("exchange")
+        extra_info += (
+            exchange_mappings["X" + exchange_name]
+            if "X" + exchange_name in exchange_mappings
+            else exchange_name
+        )
 
         extra_info += "\n[param]Currency: [/param]"
-        if "currency" in ticker_info and ticker_info["currency"]:
-            extra_info += ticker_info["currency"]
+        extra_info += ticker_stats.get("summaryDetail", {}).get("currency")
 
     else:
         extra_info += "\n[param]Company: [/param]"
@@ -919,7 +1004,7 @@ def load_custom(file_path: str) -> pd.DataFrame:
 
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         Dataframe of stock data
     """
     # Double check that the file exists
@@ -981,8 +1066,9 @@ def show_quick_performance(stock_df: pd.DataFrame, ticker: str):
         "1 Month": 100 * closes.pct_change(21)[-1],
         "1 Year": 100 * closes.pct_change(252)[-1],
     }
-    if "2022-01-03" in closes.index:
-        closes_ytd = closes[closes.index > f"{date.today().year}-01-01"]
+
+    closes_ytd = closes[closes.index.year == pd.to_datetime("today").year]
+    if not closes_ytd.empty:
         perfs["YTD"] = 100 * (closes_ytd[-1] - closes_ytd[0]) / closes_ytd[0]
     else:
         perfs["Period"] = 100 * (closes[-1] - closes[0]) / closes[0]
@@ -1005,7 +1091,7 @@ def show_quick_performance(stock_df: pd.DataFrame, ticker: str):
             str(round(np.mean(volumes[-12:-2]) / 1_000_000, 2)) + " M"
         )
 
-    perf_df["Last Price"] = str(round(closes[-1], 2))
+    perf_df["Previous Close"] = str(round(closes[-1], 2))
     print_rich_table(
         perf_df,
         show_index=False,
@@ -1026,7 +1112,7 @@ def show_codes_polygon(ticker: str):
     if cfg.API_POLYGON_KEY == "REPLACE_ME":
         console.print("[red]Polygon API key missing[/red]\n")
         return
-    r = requests.get(link)
+    r = request(link)
     if r.status_code != 200:
         console.print("[red]Error in polygon request[/red]\n")
         return
@@ -1042,3 +1128,39 @@ def show_codes_polygon(ticker: str):
     print_rich_table(
         polygon_df, show_index=False, headers=["", ""], title=f"{ticker.upper()} Codes"
     )
+
+
+def format_parse_choices(choices: List[str]) -> List[str]:
+    """Formats a list of strings to be lowercase and replace spaces with underscores.
+
+    Parameters
+    ----------
+    choices: List[str]
+        The options to be formatted
+
+    Returns
+    -------
+    clean_choices: List[str]
+        The cleaned options
+
+    """
+    return [x.lower().replace(" ", "_") for x in choices]
+
+
+def map_parse_choices(choices: List[str]) -> Dict[str, str]:
+    """Creates a mapping of clean arguments (keys) to original arguments (values)
+
+    Parameters
+    ----------
+    choices: List[str]
+        The options to be formatted
+
+    Returns
+    -------
+    clean_choices: Dict[str, str]
+        The mappung
+
+    """
+    the_dict = {x.lower().replace(" ", "_"): x for x in choices}
+    the_dict[""] = ""
+    return the_dict

@@ -35,32 +35,15 @@ class AllyController(BaseController):
     ]
     list_exchanges = ["A", "N", "Q", "U", "V"]
     PATH = "/portfolio/bro/ally/"
+    CHOICES_GENERATION = True
 
     def __init__(self, queue: List[str] = None):
         """Constructor"""
         super().__init__(queue)
 
         if session and obbff.USE_PROMPT_TOOLKIT:
-            choices: dict = {c: {} for c in self.controller_choices}
-
-            one_to_hundred: dict = {str(c): {} for c in range(1, 100)}
-            choices["history"] = {
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            choices["quote"] = {
-                "--ticker": None,
-                "-t": "--ticker",
-            }
-            choices["movers"] = {
-                "--type": {c: {} for c in self.list_choices},
-                "-t": "--type",
-                "--exchange": {c: {} for c in self.list_exchanges},
-                "-e": "--exchange",
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-
+            choices: dict = self.choices_default
+            self.choices = choices
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def print_help(self):
@@ -88,7 +71,12 @@ class AllyController(BaseController):
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
-            ally_view.display_holdings(export=ns_parser.export)
+            ally_view.display_holdings(
+                export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
+            )
 
     @log_start_end(log=logger)
     def call_history(self, other_args: List[str]):
@@ -128,7 +116,12 @@ class AllyController(BaseController):
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
-            ally_view.display_balances(export=ns_parser.export)
+            ally_view.display_balances(
+                export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
+            )
 
     @log_start_end(log=logger)
     def call_quote(self, other_args: List[str]):
@@ -190,10 +183,12 @@ class AllyController(BaseController):
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
-
             ally_view.display_top_lists(
                 list_type=ns_parser.list_type,
                 exchange=ns_parser.exchange,
                 num_to_show=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )

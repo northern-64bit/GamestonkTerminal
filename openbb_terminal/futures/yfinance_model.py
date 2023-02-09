@@ -4,13 +4,14 @@ __docformat__ = "numpy"
 import os
 import sys
 import logging
-from typing import Dict, List
-from datetime import datetime
+from typing import List, Optional
+from datetime import datetime, timedelta
 
 import yfinance as yf
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
+from openbb_terminal.rich_config import console
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.core.config.paths import MISCELLANEOUS_DIRECTORY
 
@@ -76,71 +77,111 @@ def get_search_futures(
 
 
 @log_start_end(log=logger)
-def get_historical_futures(tickers: List[str], expiry: str = "") -> Dict:
+def get_historical_futures(
+    symbols: List[str],
+    expiry: str = "",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> pd.DataFrame:
     """Get historical futures [Source: Yahoo Finance]
 
     Parameters
     ----------
-    tickers: List[str]
-        List of future timeseries tickers to display
+    symbols: List[str]
+        List of future timeseries symbols to display
     expiry: str
         Future expiry date with format YYYY-MM
+    start_date: Optional[str]
+        Start date of the historical data with format YYYY-MM-DD
+    end_date: Optional[str]
+        End date of the historical data with format YYYY-MM-DD
 
     Returns
-    ----------
-    Dict
+    -------
+    pd.DataFrame
         Dictionary with sector weightings allocation
     """
-    if expiry:
-        tickers_with_expiry = list()
 
-        for ticker in tickers:
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=3 * 365)).strftime("%Y-%m-%d")
+
+    if end_date is None:
+        end_date = datetime.now().strftime("%Y-%m-%d")
+
+    if start_date >= end_date:
+        console.print("[yellow]Start date must be before end date.[/yellow]")
+        return pd.DataFrame()
+
+    if expiry:
+        symbols_with_expiry = list()
+
+        for symbol in symbols:
             expiry_date = datetime.strptime(expiry, "%Y-%m")
-            exchange = FUTURES_DATA[FUTURES_DATA["Ticker"] == ticker][
+            exchange = FUTURES_DATA[FUTURES_DATA["Ticker"] == symbol][
                 "Exchange"
             ].values[0]
 
-            tickers_with_expiry.append(
-                f"{ticker}{MONTHS[expiry_date.month]}{str(expiry_date.year)[-2:]}.{exchange}"
+            symbols_with_expiry.append(
+                f"{symbol}{MONTHS[expiry_date.month]}{str(expiry_date.year)[-2:]}.{exchange}"
             )
 
-        return yf.download(tickers_with_expiry, progress=False, period="max")
+        return yf.download(
+            symbols_with_expiry,
+            start=start_date,
+            end=end_date,
+            progress=False,
+            period="max",
+            ignore_tz=True,
+        )
 
-    df = yf.download([t + "=F" for t in tickers], progress=False, period="max")
-    if len(tickers) > 1:
+    df = yf.download(
+        [t + "=F" for t in symbols],
+        start=start_date,
+        end=end_date,
+        progress=False,
+        period="max",
+        ignore_tz=True,
+    )
+    if len(symbols) > 1:
         df.columns = pd.MultiIndex.from_tuples(
             [(tup[0], tup[1].replace("=F", "")) for tup in df.columns]
         )
+
     return df
 
 
 @log_start_end(log=logger)
 def get_curve_futures(
-    ticker: str = "",
-):
+    symbol: str = "",
+) -> pd.DataFrame:
     """Get curve futures [Source: Yahoo Finance]
 
     Parameters
     ----------
-    ticker: str
-        Ticker to get forward curve
+    symbol: str
+        symbol to get forward curve
+
+    Returns
+    -------
+    pd.DataFrame
+        Dictionary with sector weightings allocation
     """
-    if ticker not in FUTURES_DATA["Ticker"].unique().tolist():
+    if symbol not in FUTURES_DATA["Ticker"].unique().tolist():
         return pd.DataFrame()
 
-    exchange = FUTURES_DATA[FUTURES_DATA["Ticker"] == ticker]["Exchange"].values[0]
+    exchange = FUTURES_DATA[FUTURES_DATA["Ticker"] == symbol]["Exchange"].values[0]
     today = datetime.today()
 
     futures_index = list()
     futures_curve = list()
     for i in range(36):
         future = today + relativedelta(months=i)
-        future_ticker = (
-            f"{ticker}{MONTHS[future.month]}{str(future.year)[-2:]}.{exchange}"
+        future_symbol = (
+            f"{symbol}{MONTHS[future.month]}{str(future.year)[-2:]}.{exchange}"
         )
 
         with HiddenPrints():
-            data = yf.download(future_ticker, progress=False)
+            data = yf.download(future_symbol, progress=False, ignore_tz=True)
 
         if not data.empty:
             futures_index.append(future.strftime("%Y-%b"))

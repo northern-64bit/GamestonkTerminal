@@ -6,10 +6,12 @@ from typing import Optional
 
 import urllib3
 import pandas as pd
-import requests
-
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import get_user_agent, lambda_long_number_format
+from openbb_terminal.helper_funcs import (
+    get_user_agent,
+    lambda_long_number_format,
+    request,
+)
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -118,16 +120,16 @@ def get_defi_vaults(
     ----------
     chain: str
         Blockchain - one from list [
-            'ethereum', 'polygon', 'avalanche', 'bsc', 'terra', 'fantom',
-            'moonriver', 'celo', 'heco', 'okex', 'cronos', 'arbitrum', 'eth',
-            'harmony', 'fuse', 'defichain', 'solana', 'optimism'
+        'ethereum', 'polygon', 'avalanche', 'bsc', 'terra', 'fantom',
+        'moonriver', 'celo', 'heco', 'okex', 'cronos', 'arbitrum', 'eth',
+        'harmony', 'fuse', 'defichain', 'solana', 'optimism'
         ]
     protocol: str
         DeFi protocol - one from list: [
-            'aave', 'acryptos', 'alpaca', 'anchor', 'autofarm', 'balancer', 'bancor',
-            'beefy', 'belt', 'compound', 'convex', 'cream', 'curve', 'defichain', 'geist',
-            'lido', 'liquity', 'mirror', 'pancakeswap', 'raydium', 'sushi', 'tarot', 'traderjoe',
-            'tulip', 'ubeswap', 'uniswap', 'venus', 'yearn'
+        'aave', 'acryptos', 'alpaca', 'anchor', 'autofarm', 'balancer', 'bancor',
+        'beefy', 'belt', 'compound', 'convex', 'cream', 'curve', 'defichain', 'geist',
+        'lido', 'liquity', 'mirror', 'pancakeswap', 'raydium', 'sushi', 'tarot', 'traderjoe',
+        'tulip', 'ubeswap', 'uniswap', 'venus', 'yearn'
         ]
     kind: str
         Kind/type of vault - one from list: ['lp','single','noimploss','stable']
@@ -140,7 +142,7 @@ def get_defi_vaults(
 
     headers = {"User-Agent": get_user_agent()}
     params = _prepare_params(chain=chain, protocol=protocol, kind=kind)
-    response = requests.get(
+    response = request(
         "https://apiv2.coindix.com/search", headers=headers, params=params, verify=False
     )
     if not 200 <= response.status_code < 300:

@@ -7,11 +7,10 @@ import re
 from typing import Tuple
 
 import pandas as pd
-import requests
 from bs4 import BeautifulSoup
 
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import get_user_agent
+from openbb_terminal.helper_funcs import get_user_agent, request
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +28,17 @@ def get_price_target_from_analysts(symbol: str) -> pd.DataFrame:
     -------
     pd.DataFrame
         Analysts data
+
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> df = openbb.stocks.dd.pt(symbol="AAPL")
     """
     url_market_business_insider = (
         f"https://markets.businessinsider.com/stocks/{symbol.lower()}-stock"
     )
     text_soup_market_business_insider = BeautifulSoup(
-        requests.get(
+        request(
             url_market_business_insider, headers={"User-Agent": get_user_agent()}
         ).text,
         "lxml",
@@ -84,12 +88,17 @@ def get_estimates(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame
         Quarter earnings estimates
     df_quarter_revenues : pd.DataFrame
         Quarter revenues estimates
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+        Year estimates, quarter earnings estimates, quarter revenues estimates
     """
     url_market_business_insider = (
         f"https://markets.businessinsider.com/stocks/{symbol.lower()}-stock"
     )
     text_soup_market_business_insider = BeautifulSoup(
-        requests.get(
+        request(
             url_market_business_insider, headers={"User-Agent": get_user_agent()}
         ).text,
         "lxml",
@@ -184,27 +193,31 @@ def get_estimates(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame
     )
     # df_quarter_revenues.index.name = 'Revenues'
 
-    l_quarter = list()
-    l_date = list()
-    for quarter_title in df_quarter_earnings.columns:
-        l_quarter.append(re.split("  ending", quarter_title)[0])
-        if len(re.split("  ending", quarter_title)) == 2:
-            l_date.append("ending " + re.split("  ending", quarter_title)[1].strip())
-        else:
-            l_date.append("-")
+    if not df_quarter_earnings.empty:
+        l_quarter = list()
+        l_date = list()
+        for quarter_title in df_quarter_earnings.columns:
+            l_quarter.append(re.split("  ending", quarter_title)[0])
+            if len(re.split("  ending", quarter_title)) == 2:
+                l_date.append(
+                    "ending " + re.split("  ending", quarter_title)[1].strip()
+                )
+            else:
+                l_date.append("-")
 
-    df_quarter_earnings.index.name = "QUARTER EARNINGS ESTIMATES"
-    df_quarter_earnings.columns = l_quarter
-    df_quarter_earnings.loc["Date"] = l_date
-    df_quarter_earnings = df_quarter_earnings.reindex(
-        ["Date", "No. of Analysts", "Average Estimate", "Year Ago", "Publish Date"]
-    )
+        df_quarter_earnings.index.name = "QUARTER EARNINGS ESTIMATES"
+        df_quarter_earnings.columns = l_quarter
+        df_quarter_earnings.loc["Date"] = l_date
+        df_quarter_earnings = df_quarter_earnings.reindex(
+            ["Date", "No. of Analysts", "Average Estimate", "Year Ago", "Publish Date"]
+        )
 
-    df_quarter_revenues.index.name = "QUARTER REVENUES ESTIMATES"
-    df_quarter_revenues.columns = l_quarter
-    df_quarter_revenues.loc["Date"] = l_date
-    df_quarter_revenues = df_quarter_revenues.reindex(
-        ["Date", "No. of Analysts", "Average Estimate", "Year Ago", "Publish Date"]
-    )
+    if not df_quarter_revenues.empty:
+        df_quarter_revenues.index.name = "QUARTER REVENUES ESTIMATES"
+        df_quarter_revenues.columns = l_quarter
+        df_quarter_revenues.loc["Date"] = l_date
+        df_quarter_revenues = df_quarter_revenues.reindex(
+            ["Date", "No. of Analysts", "Average Estimate", "Year Ago", "Publish Date"]
+        )
 
     return df_year_estimates, df_quarter_earnings, df_quarter_revenues

@@ -3,10 +3,9 @@ __docformat__ = "numpy"
 import logging
 
 import pandas as pd
-import requests
 
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import get_user_agent
+from openbb_terminal.helper_funcs import get_user_agent, request
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +17,7 @@ def etf_movers(sort_type: str = "gainers", export: bool = False) -> pd.DataFrame
     Parameters
     ----------
     sort_type: str
-        Data to get.  Can be "gainers", "decliners" or "active"
+        Data to get. Can be "gainers", "decliners" or "active"
 
     Returns
     -------
@@ -26,19 +25,19 @@ def etf_movers(sort_type: str = "gainers", export: bool = False) -> pd.DataFrame
         Datafame containing the name, price, change and the volume of the etf
     """
 
-    if sort_type == "gainers":
+    if sort_type.lower() == "gainers":
         url = (
             "https://www.wsj.com/market-data/mutualfunds-etfs/etfmovers?id=%7B%22application"
             "%22%3A%22WSJ%22%2C%22etfMover%22%3A%22leaders%22%2C%22count%22%3A25%7D&type="
             "mdc_etfmovers"
         )
-    elif sort_type == "decliners":
+    elif sort_type.lower() == "decliners":
         url = (
             "https://www.wsj.com/market-data/mutualfunds-etfs/etfmovers?id=%7B%22application"
             "%22%3A%22WSJ%22%2C%22etfMover%22%3A%22laggards%22%2C%22count%22%3A25%7D&type="
             "mdc_etfmovers"
         )
-    elif sort_type == "active":
+    elif sort_type.lower() == "active":
         url = (
             "https://www.wsj.com/market-data/mutualfunds-etfs/etfmovers?id=%7B%22application"
             "%22%3A%22WSJ%22%2C%22etfMover%22%3A%22most_active%22%2C%22count%22%3A25%7D&type="
@@ -48,7 +47,7 @@ def etf_movers(sort_type: str = "gainers", export: bool = False) -> pd.DataFrame
         url = ""
 
     if url:
-        data = requests.get(url, headers={"User-Agent": get_user_agent()}).json()
+        data = request(url, headers={"User-Agent": get_user_agent()}).json()
         symbol, name, last_price, net_change, percent_change, volume = (
             [],
             [],

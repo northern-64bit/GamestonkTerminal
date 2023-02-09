@@ -37,6 +37,7 @@ def show_indices(
     raw: bool = False,
     external_axes: Optional[List[plt.axes]] = None,
     export: str = "",
+    sheet_name: str = None,
 ):
     """Load (and show) the selected indices over time [Source: Yahoo Finance]
     Parameters
@@ -62,7 +63,7 @@ def show_indices(
     export : str
         Export data to csv,json,xlsx or png,jpg,pdf,svg file
     Returns
-    ----------
+    -------
     Plots the Series.
     """
 
@@ -80,7 +81,6 @@ def show_indices(
             label = index
 
         if not indices_data[index].empty:
-
             if returns:
                 indices_data.index.name = "date"
                 data_to_percent = 100 * (indices_data[index].values - 1)
@@ -127,6 +127,7 @@ def show_indices(
             os.path.dirname(os.path.abspath(__file__)),
             "index_data",
             indices_data,
+            sheet_name,
         )
 
     return indices_data
@@ -142,7 +143,7 @@ def search_indices(query: list, limit: int = 10):
     limit: int
         The amount of views you want to show, by default this is set to 10.
     Returns
-    ----------
+    -------
     Shows a rich table with the available options.
     """
 

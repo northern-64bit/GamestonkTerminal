@@ -2,15 +2,20 @@
 """Main Terminal Module."""
 __docformat__ = "numpy"
 
+from datetime import datetime
 import argparse
 import difflib
 import logging
 import os
+import re
 from pathlib import Path
 import sys
 import webbrowser
-from typing import List
-import dotenv
+from typing import List, Dict, Optional
+import contextlib
+import time
+
+import certifi
 from rich import panel
 
 from prompt_toolkit import PromptSession
@@ -24,16 +29,16 @@ from openbb_terminal.terminal_helper import is_packaged_application
 from openbb_terminal.core.config.paths import (
     HOME_DIRECTORY,
     MISCELLANEOUS_DIRECTORY,
-    REPOSITORY_ENV_FILE,
+    REPOSITORY_DIRECTORY,
     USER_DATA_DIRECTORY,
     USER_ENV_FILE,
     USER_ROUTINES_DIRECTORY,
+    load_dotenv_with_priority,
 )
 
 from openbb_terminal.helper_funcs import (
     check_positive,
     get_flair,
-    parse_simple_args,
     EXPORT_ONLY_RAW_DATA_ALLOWED,
 )
 from openbb_terminal.loggers import setup_logging
@@ -47,9 +52,9 @@ from openbb_terminal.terminal_helper import (
     is_reset,
     print_goodbye,
     reset,
-    suppress_stdout,
     update_terminal,
     welcome_message,
+    suppress_stdout,
 )
 from openbb_terminal.helper_funcs import parse_and_split_input
 from openbb_terminal.keys_model import first_time_user
@@ -57,11 +62,18 @@ from openbb_terminal.common import feedparser_view
 from openbb_terminal.reports.reports_model import ipykernel_launcher
 
 # pylint: disable=too-many-public-methods,import-outside-toplevel, too-many-function-args
-# pylint: disable=too-many-branches,no-member,C0302,too-many-return-statements
+# pylint: disable=too-many-branches,no-member,C0302,too-many-return-statements, inconsistent-return-statements
 
 logger = logging.getLogger(__name__)
 
 env_file = str(USER_ENV_FILE)
+
+if is_packaged_application():
+    # Necessary for installer so that it can locate the correct certificates for
+    # API calls and https
+    # https://stackoverflow.com/questions/27835619/urllib-and-ssl-certificate-verify-failed-error/73270162#73270162
+    os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
+    os.environ["SSL_CERT_FILE"] = certifi.where()
 
 
 class TerminalController(BaseController):
@@ -100,6 +112,7 @@ class TerminalController(BaseController):
     GUESS_NUMBER_TRIES_LEFT = 0
     GUESS_SUM_SCORE = 0.0
     GUESS_CORRECTLY = 0
+    CHOICES_GENERATION = False
 
     def __init__(self, jobs_cmds: List[str] = None):
         """Construct terminal controller."""
@@ -120,19 +133,25 @@ class TerminalController(BaseController):
         """Update runtime choices."""
         self.ROUTINE_FILES = {
             filepath.name: filepath
-            for filepath in (MISCELLANEOUS_DIRECTORY / "routines").rglob("*.openbb")
+            for filepath in USER_ROUTINES_DIRECTORY.rglob("*.openbb")
         }
-        self.ROUTINE_FILES.update(
-            {
-                filepath.name: filepath
-                for filepath in USER_ROUTINES_DIRECTORY.rglob("*.openbb")
-            }
-        )
-        self.ROUTINE_CHOICES = {filename: None for filename in self.ROUTINE_FILES}
+
+        self.ROUTINE_CHOICES = {}
+        self.ROUTINE_CHOICES["--file"] = {
+            filename: None for filename in self.ROUTINE_FILES
+        }
+        self.ROUTINE_CHOICES["--example"] = None
+        self.ROUTINE_CHOICES["-e"] = None
+        self.ROUTINE_CHOICES["--input"] = None
+        self.ROUTINE_CHOICES["-i"] = None
+        self.ROUTINE_CHOICES["--help"] = None
+        self.ROUTINE_CHOICES["--h"] = None
+
         if session and obbff.USE_PROMPT_TOOLKIT:
             choices: dict = {c: {} for c in self.controller_choices}
             choices["support"] = self.SUPPORT_CHOICES
             choices["exe"] = self.ROUTINE_CHOICES
+            choices["news"] = self.NEWS_CHOICES
 
             self.completer = NestedCompleter.from_nested_dict(choices)
 
@@ -147,8 +166,7 @@ class TerminalController(BaseController):
         if not is_packaged_application():
             mt.add_cmd("update")
         mt.add_cmd("wiki")
-        mt.add_cmd("record")
-        mt.add_cmd("stop")
+        mt.add_cmd("news")
         mt.add_raw("\n")
         mt.add_info("_configure_")
         mt.add_menu("keys")
@@ -156,7 +174,9 @@ class TerminalController(BaseController):
         mt.add_menu("sources")
         mt.add_menu("settings")
         mt.add_raw("\n")
-        mt.add_cmd("news")
+        mt.add_info("_scripts_")
+        mt.add_cmd("record")
+        mt.add_cmd("stop")
         mt.add_cmd("exe")
         mt.add_raw("\n")
         mt.add_info("_main_menu_")
@@ -211,11 +231,11 @@ class TerminalController(BaseController):
                 sources=news_parser.sources,
                 limit=news_parser.limit,
                 export=news_parser.export,
+                sheet_name=news_parser.sheet_name,
             )
 
     def call_guess(self, other_args: List[str]) -> None:
         """Process guess command."""
-        import time
         import json
         import random
 
@@ -236,7 +256,7 @@ class TerminalController(BaseController):
             )
             if other_args and "-" not in other_args[0][0]:
                 other_args.insert(0, "-l")
-                ns_parser_guess = parse_simple_args(parser_exe, other_args)
+                ns_parser_guess = self.parse_simple_args(parser_exe, other_args)
 
                 if self.GUESS_TOTAL_TRIES == 0:
                     self.GUESS_NUMBER_TRIES_LEFT = ns_parser_guess.limit
@@ -294,7 +314,6 @@ class TerminalController(BaseController):
 
                 # Compute average score and provide a result if it's the last try
                 if self.GUESS_TOTAL_TRIES > 0:
-
                     self.GUESS_NUMBER_TRIES_LEFT -= 1
                     if self.GUESS_NUMBER_TRIES_LEFT == 0 and self.GUESS_TOTAL_TRIES > 1:
                         color = (
@@ -637,7 +656,9 @@ class TerminalController(BaseController):
 
         if not other_args:
             console.print(
-                "[red]Provide a path to the routine you wish to execute.\n[/red]"
+                "[red]Provide a path to the routine you wish to execute. For an example, please use "
+                "`exe --example` and for documentation and to learn how create your own script "
+                "type `about exe`.\n[/red]"
             )
             return
 
@@ -664,14 +685,15 @@ class TerminalController(BaseController):
             add_help=False,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             prog="exe",
-            description="Execute automated routine script.",
+            description="Execute automated routine script. For an example, please use "
+            "`exe --example` and for documentation and to learn how create your own script "
+            "type `about exe`.",
         )
         parser_exe.add_argument(
             "--file",
             help="The path or .openbb file to run.",
             dest="path",
-            default="",
-            required="-h" not in args,
+            default=None,
         )
         parser_exe.add_argument(
             "-i",
@@ -680,12 +702,33 @@ class TerminalController(BaseController):
             dest="routine_args",
             type=lambda s: [str(item) for item in s.split(",")],
         )
+        parser_exe.add_argument(
+            "-e",
+            "--example",
+            help="Run an example script to understand how routines can be used.",
+            dest="example",
+            action="store_true",
+            default=False,
+        )
+
+        if not args[0]:
+            return console.print("[red]Please select an .openbb routine file.[/red]\n")
+
         if args and "-" not in args[0][0]:
             args.insert(0, "--file")
-        ns_parser_exe = parse_simple_args(parser_exe, args)
+        ns_parser_exe = self.parse_simple_args(parser_exe, args)
         if ns_parser_exe:
-            if ns_parser_exe.path:
-                if ns_parser_exe.path in self.ROUTINE_CHOICES:
+            if ns_parser_exe.path or ns_parser_exe.example:
+                if ns_parser_exe.example:
+                    path = (
+                        MISCELLANEOUS_DIRECTORY / "routines" / "routine_example.openbb"
+                    )
+                    console.print(
+                        "[green]Executing an example, please type `about exe` "
+                        "to learn how to create your own script.[/green]\n"
+                    )
+                    time.sleep(3)
+                elif ns_parser_exe.path in self.ROUTINE_CHOICES["--file"]:
                     path = self.ROUTINE_FILES[ns_parser_exe.path]
                 else:
                     path = ns_parser_exe.path
@@ -825,8 +868,7 @@ def terminal(jobs_cmds: List[str] = None, test_mode=False):
         t_controller.print_help()
         check_for_updates()
 
-    dotenv.load_dotenv(USER_ENV_FILE)
-    dotenv.load_dotenv(REPOSITORY_ENV_FILE, override=True)
+    load_dotenv_with_priority()
 
     while ret_code:
         if obbff.ENABLE_QUICK_EXIT:
@@ -907,7 +949,7 @@ def terminal(jobs_cmds: List[str] = None, test_mode=False):
                 an_input,
             )
             console.print(
-                f"[red]The command '{an_input}' doesn't exist on the / menu.[/red]",
+                f"[red]The command '{an_input}' doesn't exist on the / menu.[/red]\n",
             )
             similar_cmd = difflib.get_close_matches(
                 an_input.split(" ")[0] if " " in an_input else an_input,
@@ -929,10 +971,8 @@ def terminal(jobs_cmds: List[str] = None, test_mode=False):
                 else:
                     an_input = similar_cmd[0]
 
-                console.print(f"\n[green]Replacing by '{an_input}'.[/green]")
+                console.print(f"[green]Replacing by '{an_input}'.[/green]")
                 t_controller.queue.insert(0, an_input)
-            else:
-                console.print("\n")
 
 
 def insert_start_slash(cmds: List[str]) -> List[str]:
@@ -949,6 +989,8 @@ def run_scripts(
     test_mode: bool = False,
     verbose: bool = False,
     routines_args: List[str] = None,
+    special_arguments: Optional[Dict[str, str]] = None,
+    output: bool = True,
 ):
     """Run given .openbb scripts.
 
@@ -963,114 +1005,101 @@ def run_scripts(
     routines_args : List[str]
         One or multiple inputs to be replaced in the routine and separated by commas.
         E.g. GME,AMC,BTC-USD
+    special_arguments: Optional[Dict[str, str]]
+        Replace `${key=default}` with `value` for every key in the dictionary
+    output: bool
+        Whether to log tests to txt files
     """
-    if path.exists():
-        with path.open() as fp:
-            raw_lines = [x for x in fp if (not is_reset(x)) and ("#" not in x) and x]
-            raw_lines = [
-                raw_line.strip("\n") for raw_line in raw_lines if raw_line.strip("\n")
-            ]
-
-            if routines_args:
-                lines = list()
-                for rawline in raw_lines:
-                    templine = rawline
-                    for i, arg in enumerate(routines_args):
-                        templine = templine.replace(f"$ARGV[{i}]", arg)
-                    lines.append(templine)
-            else:
-                lines = raw_lines
-
-            if test_mode and "exit" not in lines[-1]:
-                lines.append("exit")
-
-            export_folder = ""
-            if "export" in lines[0]:
-                export_folder = lines[0].split("export ")[1].rstrip()
-                lines = lines[1:]
-
-            simulate_argv = f"/{'/'.join([line.rstrip() for line in lines])}"
-            file_cmds = simulate_argv.replace("//", "/home/").split()
-            file_cmds = insert_start_slash(file_cmds) if file_cmds else file_cmds
-            if export_folder:
-                file_cmds = [f"export {export_folder}{' '.join(file_cmds)}"]
-            else:
-                file_cmds = [" ".join(file_cmds)]
-
-            if not test_mode:
-                terminal(file_cmds, test_mode=True)
-            else:
-                if verbose:
-                    terminal(file_cmds, test_mode=True)
-                else:
-                    with suppress_stdout():
-                        terminal(file_cmds, test_mode=True)
-    else:
+    if not path.exists():
         console.print(f"File '{path}' doesn't exist. Launching base terminal.\n")
         if not test_mode:
             terminal()
 
+    with path.open() as fp:
+        raw_lines = [x for x in fp if (not is_reset(x)) and ("#" not in x) and x]
+        raw_lines = [
+            raw_line.strip("\n") for raw_line in raw_lines if raw_line.strip("\n")
+        ]
 
-def build_test_path_list(path_list: List[str], filtert: str) -> List[Path]:
-    """Build the paths to use in test mode."""
-    if path_list == "":
-        console.print("Please send a path when using test mode")
-        return []
+        if routines_args:
+            lines = []
+            for rawline in raw_lines:
+                templine = rawline
+                for i, arg in enumerate(routines_args):
+                    templine = templine.replace(f"$ARGV[{i}]", arg)
+                lines.append(templine)
+        # Handle new testing arguments:
+        elif special_arguments:
+            lines = []
+            for line in raw_lines:
+                new_line = re.sub(
+                    r"\${[^{]+=[^{]+}",
+                    lambda x: replace_dynamic(x, special_arguments),  # type: ignore
+                    line,
+                )
+                lines.append(new_line)
 
-    test_files = []
-
-    for path in path_list:
-        user_script_path = USER_DATA_DIRECTORY / "scripts" / path
-        default_script_path = MISCELLANEOUS_DIRECTORY / path
-
-        if user_script_path.exists():
-            chosen_path = user_script_path
-        elif default_script_path.exists():
-            chosen_path = default_script_path
         else:
-            console.print(f"\n[red]Can't find the file:{path}[/red]\n")
-            continue
+            lines = raw_lines
 
-        if chosen_path.is_file() and str(chosen_path).endswith(".openbb"):
-            test_files.append(chosen_path)
-        elif chosen_path.is_dir():
-            script_directory = chosen_path
-            script_list = script_directory.glob("**/*.openbb")
-            script_list = [script for script in script_list if script.is_file()]
-            script_list = [script for script in script_list if filtert in str(script)]
-            test_files.extend(script_list)
+        if test_mode and "exit" not in lines[-1]:
+            lines.append("exit")
 
-    return test_files
+        export_folder = ""
+        if "export" in lines[0]:
+            export_folder = lines[0].split("export ")[1].rstrip()
+            lines = lines[1:]
+
+        simulate_argv = f"/{'/'.join([line.rstrip() for line in lines])}"
+        file_cmds = simulate_argv.replace("//", "/home/").split()
+        file_cmds = insert_start_slash(file_cmds) if file_cmds else file_cmds
+        if export_folder:
+            file_cmds = [f"export {export_folder}{' '.join(file_cmds)}"]
+        else:
+            file_cmds = [" ".join(file_cmds)]
+
+        if not test_mode or verbose:
+            terminal(file_cmds, test_mode=True)
+        else:
+            with suppress_stdout():
+                print(f"To ensure: {output}")
+                if output:
+                    timestamp = datetime.now().timestamp()
+                    stamp_str = str(timestamp).replace(".", "")
+                    whole_path = Path(REPOSITORY_DIRECTORY / "integration_test_output")
+                    whole_path.mkdir(parents=True, exist_ok=True)
+                    first_cmd = file_cmds[0].split("/")[1]
+                    with open(
+                        whole_path / f"{stamp_str}_{first_cmd}_output.txt", "w"
+                    ) as output_file:
+                        with contextlib.redirect_stdout(output_file):
+                            terminal(file_cmds, test_mode=True)
+                else:
+                    terminal(file_cmds, test_mode=True)
 
 
-def run_test_list(path_list: List[str], filtert: str, verbose: bool):
-    """Run commands in test mode."""
-    os.environ["DEBUG_MODE"] = "true"
+def replace_dynamic(match: re.Match, special_arguments: Dict[str, str]) -> str:
+    """Replaces ${key=default} with value in special_arguments if it exists, else with default.
 
-    test_files = build_test_path_list(path_list=path_list, filtert=filtert)
-    SUCCESSES = 0
-    FAILURES = 0
-    fails = {}
-    length = len(test_files)
-    i = 0
-    console.print("[green]OpenBB Terminal Integrated Tests:\n[/green]")
-    for file in test_files:
-        console.print(f"{((i/length)*100):.1f}%  {file}")
-        try:
-            run_scripts(file, test_mode=True, verbose=verbose)
-            SUCCESSES += 1
-        except Exception as e:
-            fails[file] = e
-            FAILURES += 1
-        i += 1
-    if fails:
-        console.print("\n[red]Failures:[/red]\n")
-        for file, exception in fails.items():
-            logger.error("%s: %s failed", file, exception)
-            console.print(f"{file}: {exception}\n")
-    console.print(
-        f"Summary: [green]Successes: {SUCCESSES}[/green] [red]Failures: {FAILURES}[/red]"
-    )
+    Parameters
+    ----------
+    match: re.Match[str]
+        The match object
+    special_arguments: Dict[str, str]
+        The key value pairs to replace in the scripts
+
+    Returns
+    ----------
+    str
+        The new string
+    """
+
+    cleaned = match[0].replace("{", "").replace("}", "").replace("$", "")
+    key, default = cleaned.split("=")
+    dict_value = special_arguments.get(key, default)
+    if dict_value:
+        return dict_value
+    return default
 
 
 def run_routine(file: str, routines_args=List[str]):
@@ -1090,10 +1119,7 @@ def run_routine(file: str, routines_args=List[str]):
 
 def main(
     debug: bool,
-    test: bool,
-    filtert: str,
     path_list: List[str],
-    verbose: bool,
     routines_args: List[str] = None,
     **kwargs,
 ):
@@ -1117,10 +1143,6 @@ def main(
     """
     if kwargs["module"] == "ipykernel_launcher":
         ipykernel_launcher(kwargs["module_file"], kwargs["module_hist_file"])
-
-    if test:
-        run_test_list(path_list=path_list, filtert=filtert, verbose=verbose)
-        return
 
     if debug:
         os.environ["DEBUG_MODE"] = "true"
@@ -1159,29 +1181,6 @@ def parse_args_and_run():
         type=str,
     )
     parser.add_argument(
-        "-t",
-        "--test",
-        dest="test",
-        action="store_true",
-        default=False,
-        help="Whether to run in test mode.",
-    )
-    parser.add_argument(
-        "--filter",
-        help="Send a keyword to filter in file name",
-        dest="filtert",
-        default="",
-        type=str,
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        help="Enable verbose output for debugging",
-        dest="verbose",
-        action="store_true",
-        default=False,
-    )
-    parser.add_argument(
         "-i",
         "--input",
         help=(
@@ -1200,6 +1199,15 @@ def parse_args_and_run():
         dest="module",
         default="",
         type=str,
+    )
+    parser.add_argument(
+        "-t",
+        "--test",
+        action="store_true",
+        help=(
+            "Run the terminal in testing mode. Also run this option and '-h'"
+            " to see testing argument options."
+        ),
     )
     parser.add_argument(
         "-f",
@@ -1229,10 +1237,7 @@ def parse_args_and_run():
 
     main(
         ns_parser.debug,
-        ns_parser.test,
-        ns_parser.filtert,
         ns_parser.path,
-        ns_parser.verbose,
         ns_parser.routine_args,
         module=ns_parser.module,
         module_file=ns_parser.module_file,

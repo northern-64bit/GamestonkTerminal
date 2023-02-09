@@ -22,10 +22,11 @@ from openbb_terminal.helper_funcs import (
     is_valid_axes_count,
     print_rich_table,
 )
-from openbb_terminal.rich_config import console
 from openbb_terminal.stocks.comparison_analysis import yahoo_finance_model
 
 logger = logging.getLogger(__name__)
+
+# pylint: disable=too-many-arguments
 
 register_matplotlib_converters()
 
@@ -43,10 +44,12 @@ d_candle_types = {
 @log_start_end(log=logger)
 def display_historical(
     similar: List[str],
-    start_date: str = (datetime.now() - timedelta(days=366)).strftime("%Y-%m-%d"),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     candle_type: str = "a",
     normalize: bool = True,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
     """Display historical stock prices. [Source: Yahoo Finance]
@@ -57,8 +60,10 @@ def display_historical(
         List of similar tickers.
         Comparable companies can be accessed through
         finnhub_peers(), finviz_peers(), polygon_peers().
-    start_date: str, optional
-        Start date of comparison, by default 1 year ago
+    start_date: Optional[str], optional
+        Initial date (e.g., 2021-10-01). Defaults to 1 year back
+    end_date: Optional[str], optional
+        End date (e.g., 2023-01-01)
     candle_type: str, optional
         OHLCA column to use or R to use daily returns calculated from Adjusted Close, by default "a" for Adjusted Close
     normalize: bool, optional
@@ -67,9 +72,10 @@ def display_historical(
         Format to export historical prices, by default ""
     external_axes: Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
-
     """
-    df_similar = yahoo_finance_model.get_historical(similar, start_date, candle_type)
+    df_similar = yahoo_finance_model.get_historical(
+        similar, start_date, end_date, candle_type
+    )
 
     # This puts everything on 0-1 scale for visualizing
     if normalize:
@@ -101,16 +107,21 @@ def display_historical(
         theme.visualize_output()
 
     export_data(
-        export, os.path.dirname(os.path.abspath(__file__)), "historical", df_similar
+        export,
+        os.path.dirname(os.path.abspath(__file__)),
+        "historical",
+        df_similar,
+        sheet_name,
     )
-    console.print("")
 
 
 @log_start_end(log=logger)
 def display_volume(
     similar: List[str],
-    start_date: str = (datetime.now() - timedelta(days=366)).strftime("%Y-%m-%d"),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
     """Display stock volume. [Source: Yahoo Finance]
@@ -121,14 +132,16 @@ def display_volume(
         List of similar tickers.
         Comparable companies can be accessed through
         finnhub_peers(), finviz_peers(), polygon_peers().
-    start_date : str, optional
-        Start date of comparison, by default 1 year ago
+    start_date : Optional[str], optional
+        Initial date (e.g., 2021-10-01). Defaults to 1 year back
+    end_date : Optional[str], optional
+        End date (e.g., 2023-01-01). Defaults to today
     export : str, optional
         Format to export historical prices, by default ""
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
-    df_similar = yahoo_finance_model.get_volume(similar, start_date)
+    df_similar = yahoo_finance_model.get_volume(similar, start_date, end_date)
 
     # This plot has 1 axis
     if not external_axes:
@@ -154,20 +167,25 @@ def display_volume(
         theme.visualize_output()
 
     export_data(
-        export, os.path.dirname(os.path.abspath(__file__)), "volume", df_similar
+        export,
+        os.path.dirname(os.path.abspath(__file__)),
+        "volume",
+        df_similar,
+        sheet_name,
     )
-    console.print("")
 
 
 @log_start_end(log=logger)
 def display_correlation(
     similar: List[str],
-    start_date: str = (datetime.now() - timedelta(days=366)).strftime("%Y-%m-%d"),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     candle_type: str = "a",
     display_full_matrix: bool = False,
     raw: bool = False,
     external_axes: Optional[List[plt.Axes]] = None,
     export: str = "",
+    sheet_name: str = None,
 ):
     """
     Correlation heatmap based on historical price comparison
@@ -179,8 +197,10 @@ def display_correlation(
         List of similar tickers.
         Comparable companies can be accessed through
         finnhub_peers(), finviz_peers(), polygon_peers().
-    start_date : str, optional
-        Start date of comparison, by default 1 year ago
+    start_date : Optional[str], optional
+        Initial date (e.g., 2021-10-01). Defaults to 1 year back
+    end_date : Optional[str], optional
+        End date (e.g., 2023-01-01)
     candle_type : str, optional
         OHLCA column to use for candles or R for returns, by default "a" for Adjusted Close
     display_full_matrix : bool, optional
@@ -193,8 +213,11 @@ def display_correlation(
         Format to export correlation prices, by default ""
     """
 
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=366)).strftime("%Y-%m-%d")
+
     correlations, df_similar = yahoo_finance_model.get_correlation(
-        similar, start_date, candle_type
+        similar, start_date, end_date, candle_type
     )
 
     mask = None
@@ -234,8 +257,13 @@ def display_correlation(
     if not external_axes:
         theme.visualize_output()
 
-    export_data(export, os.path.dirname(os.path.abspath(__file__)), "hcorr", df_similar)
-    console.print("")
+    export_data(
+        export,
+        os.path.dirname(os.path.abspath(__file__)),
+        "hcorr",
+        df_similar,
+        sheet_name,
+    )
 
 
 @log_start_end(log=logger)

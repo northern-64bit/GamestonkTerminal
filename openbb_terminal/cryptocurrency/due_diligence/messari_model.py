@@ -4,11 +4,10 @@ __docformat__ = "numpy"
 # pylint: disable=C0301,C0302
 
 import logging
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 from datetime import datetime, timedelta
 import re
 import pandas as pd
-import requests
 
 from openbb_terminal import config_terminal as cfg
 from openbb_terminal.cryptocurrency.dataframe_helpers import (
@@ -19,7 +18,7 @@ from openbb_terminal.cryptocurrency.due_diligence.pycoingecko_model import (
     get_coin_tokenomics,
 )
 from openbb_terminal.decorators import check_api_key, log_start_end
-from openbb_terminal.helper_funcs import lambda_long_number_format
+from openbb_terminal.helper_funcs import lambda_long_number_format, request
 from openbb_terminal.rich_config import console
 
 # pylint: disable=unsupported-assignment-operation
@@ -45,7 +44,7 @@ def get_available_timeseries(only_free: bool = True) -> pd.DataFrame:
     pd.DataFrame
         available timeseries
     """
-    r = requests.get("https://data.messari.io/api/v1/assets/metrics")
+    r = request("https://data.messari.io/api/v1/assets/metrics")
     if r.status_code == 200:
         data = r.json()
         metrics = data["data"]["metrics"]
@@ -81,8 +80,8 @@ base_url2 = "https://data.messari.io/api/v2/"
 def get_marketcap_dominance(
     symbol: str,
     interval: str = "1d",
-    start_date: str = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"),
-    end_date: str = datetime.now().strftime("%Y-%m-%d"),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
 ) -> pd.DataFrame:
     """Returns market dominance of a coin over time
     [Source: https://messari.io/]
@@ -93,24 +92,36 @@ def get_marketcap_dominance(
         Crypto symbol to check market cap dominance
     interval : str
         Interval frequency (possible values are: 5m, 15m, 30m, 1h, 1d, 1w)
-    start_date : int
+    start_date : Optional[str]
         Initial date like string (e.g., 2021-10-01)
-    end_date : int
+    end_date : Optional[str]
         End date like string (e.g., 2021-10-01)
 
     Returns
     -------
     pd.DataFrame
         market dominance percentage over time
+
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> mcapdom_df = openbb.crypto.dd.mcapdom(symbol="BTC")
     """
 
-    df, _ = get_messari_timeseries(
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+
+    if end_date is None:
+        end_date = datetime.now().strftime("%Y-%m-%d")
+
+    messari_timeseries = get_messari_timeseries(
         symbol=symbol,
         end_date=end_date,
         start_date=start_date,
         interval=interval,
         timeseries_id="mcap.dom",
     )
+    df, _ = messari_timeseries if messari_timeseries else (pd.DataFrame(), "")
     return df
 
 
@@ -120,8 +131,8 @@ def get_messari_timeseries(
     symbol: str,
     timeseries_id: str,
     interval: str = "1d",
-    start_date: str = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"),
-    end_date: str = datetime.now().strftime("%Y-%m-%d"),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
 ) -> Tuple[pd.DataFrame, str]:
     """Returns messari timeseries
     [Source: https://messari.io/]
@@ -134,18 +145,23 @@ def get_messari_timeseries(
         Messari timeserie id
     interval : str
         Interval frequency (possible values are: 5m, 15m, 30m, 1h, 1d, 1w)
-    start : int
+    start : Optional[str]
         Initial date like string (e.g., 2021-10-01)
-    end : int
+    end : Optional[str]
         End date like string (e.g., 2021-10-01)
 
     Returns
     -------
-    pd.DataFrame
-        messari timeserie over time
-    str
-        timeserie title
+    Tuple[pd.DataFrame, str]
+        Messari timeseries over time,
+        Timeseries title
     """
+
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+
+    if end_date is None:
+        end_date = datetime.now().strftime("%Y-%m-%d")
 
     url = base_url + f"assets/{symbol}/metrics/{timeseries_id}/time-series"
 
@@ -157,7 +173,7 @@ def get_messari_timeseries(
         "interval": interval,
     }
 
-    r = requests.get(url, params=parameters, headers=headers)
+    r = request(url, params=parameters, headers=headers)
 
     df = pd.DataFrame()
     title = ""
@@ -205,7 +221,7 @@ def get_links(symbol: str) -> pd.DataFrame:
 
     params = {"fields": "profile/general/overview/official_links"}
 
-    r = requests.get(url, headers=headers, params=params)
+    r = request(url, headers=headers, params=params)
 
     df = pd.DataFrame()
 
@@ -246,7 +262,7 @@ def get_roadmap(symbol: str, ascend: bool = True) -> pd.DataFrame:
 
     params = {"fields": "profile/general/roadmap"}
 
-    r = requests.get(url, headers=headers, params=params)
+    r = request(url, headers=headers, params=params)
 
     df = pd.DataFrame()
 
@@ -280,11 +296,11 @@ def get_tokenomics(symbol: str, coingecko_id: str) -> Tuple[pd.DataFrame, pd.Dat
         Crypto symbol to check tokenomics
     coingecko_id : str
         ID from coingecko
+
     Returns
     -------
-    pd.DataFrame
-        Metric Value tokenomics
-    pd.DataFrame
+    Tuple[pd.DataFrame, pd.DataFrame]
+        Metric Value tokenomics,
         Circulating supply overtime
     """
 
@@ -294,7 +310,7 @@ def get_tokenomics(symbol: str, coingecko_id: str) -> Tuple[pd.DataFrame, pd.Dat
 
     params = {"fields": "profile/economics/consensus_and_emission"}
 
-    r = requests.get(url, headers=headers, params=params)
+    r = request(url, headers=headers, params=params)
 
     df = pd.DataFrame()
     circ_df = pd.DataFrame()
@@ -353,14 +369,11 @@ def get_project_product_info(
 
     Returns
     -------
-    pd.DataFrame
-        Metric, Value with project and technology details
-    pd.DataFrame
-        coin public repos
-    pd.DataFrame
-        coin audits
-    pd.DataFrame
-        coin known exploits/vulns
+    Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]
+        Metric, Value with project and technology details,
+        Coin public repos,
+        Coin audits,
+        Coin known exploits/vulns
     """
 
     url = base_url2 + f"assets/{symbol}/profile"
@@ -369,7 +382,7 @@ def get_project_product_info(
 
     params = {"fields": "profile/general/overview/project_details,profile/technology"}
 
-    r = requests.get(url, headers=headers, params=params)
+    r = request(url, headers=headers, params=params)
 
     df = pd.DataFrame()
     if r.status_code == 200:
@@ -420,10 +433,9 @@ def get_team(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     Returns
     -------
-    pd.DataFrame
-        individuals
-    pd.DataFrame
-        organizations
+    Tuple[pd.DataFrame, pd.DataFrame]
+        Individuals,
+        Organizations
     """
 
     url = base_url2 + f"assets/{symbol}/profile"
@@ -432,7 +444,7 @@ def get_team(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     params = {"fields": "profile/contributors"}
 
-    r = requests.get(url, headers=headers, params=params)
+    r = request(url, headers=headers, params=params)
 
     df = pd.DataFrame()
     if r.status_code == 200:
@@ -496,10 +508,9 @@ def get_investors(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     Returns
     -------
-    pd.DataFrame
-        individuals
-    pd.DataFrame
-        organizations
+    Tuple[pd.DataFrame, pd.DataFrame]
+        Individuals,
+        Organizations
     """
 
     url = base_url2 + f"assets/{symbol}/profile"
@@ -508,7 +519,7 @@ def get_investors(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     params = {"fields": "profile/investors"}
 
-    r = requests.get(url, headers=headers, params=params)
+    r = request(url, headers=headers, params=params)
 
     df = pd.DataFrame()
     if r.status_code == 200:
@@ -570,9 +581,8 @@ def get_governance(symbol: str) -> Tuple[str, pd.DataFrame]:
 
     Returns
     -------
-    str
-        governance summary
-    pd.DataFrame
+    Tuple[str, pd.DataFrame]
+        Governance summary,
         Metric Value with governance details
     """
 
@@ -582,7 +592,7 @@ def get_governance(symbol: str) -> Tuple[str, pd.DataFrame]:
 
     params = {"fields": "profile/governance"}
 
-    r = requests.get(url, headers=headers, params=params)
+    r = request(url, headers=headers, params=params)
 
     df = pd.DataFrame()
     if r.status_code == 200:
@@ -643,14 +653,16 @@ def get_fundraising(
 
     Returns
     -------
-    str
-        launch summary
-    pd.DataFrame
-        Sales rounds
-    pd.DataFrame
-        Treasury Accounts
-    pd.DataFrame
+    Tuple[str, pd.DataFrame, pd.DataFrame, pd.DataFrame]
+        Launch summary,
+        Sales rounds,
+        Treasury Accounts,
         Metric Value launch details
+
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> fundraise = openbb.crypto.dd.fr(symbol="BTC")
     """
 
     url = base_url2 + f"assets/{symbol}/profile"
@@ -659,7 +671,7 @@ def get_fundraising(
 
     params = {"fields": "profile/economics/launch"}
 
-    r = requests.get(url, headers=headers, params=params)
+    r = request(url, headers=headers, params=params)
 
     df = pd.DataFrame()
     if r.status_code == 200:

@@ -3,27 +3,20 @@ __docformat__ = "numpy"
 
 import logging
 import os
-from itertools import combinations
-from typing import Dict, Optional, List, Union
+from typing import Dict, List, Optional, Union
 
-from matplotlib.units import ConversionError
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.units import ConversionError
 from pandas.plotting import register_matplotlib_converters
 
 from openbb_terminal.config_plot import PLOT_DPI
-from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import (
-    export_data,
-    plot_autoscale,
-)
-from openbb_terminal.helper_funcs import (
-    print_rich_table,
-)
-from openbb_terminal.rich_config import console
-from openbb_terminal.econometrics import econometrics_model
 from openbb_terminal.config_terminal import theme
+from openbb_terminal.decorators import log_start_end
+from openbb_terminal.econometrics import econometrics_model
 from openbb_terminal.econometrics.econometrics_helpers import get_ending
+from openbb_terminal.helper_funcs import export_data, plot_autoscale, print_rich_table
+from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +28,7 @@ def show_options(
     datasets: Dict[str, pd.DataFrame],
     dataset_name: str = None,
     export: str = "",
+    sheet_name: str = None,
 ):
     """Plot custom data
 
@@ -44,6 +38,8 @@ def show_options(
         The loaded in datasets
     dataset_name: str
         The name of the dataset you wish to show options for
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export image
     """
@@ -67,6 +63,7 @@ def show_options(
                 os.path.dirname(os.path.abspath(__file__)),
                 f"{dataset}_options",
                 data_values.set_index("column"),
+                sheet_name,
             )
 
 
@@ -74,6 +71,7 @@ def show_options(
 def display_plot(
     data: Union[pd.Series, pd.DataFrame, Dict[str, pd.DataFrame]],
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.axes]] = None,
 ):
     """Plot data from a dataset
@@ -82,6 +80,8 @@ def display_plot(
     ----------
     data: Union[pd.Series, pd.DataFrame, Dict[str: pd.DataFrame]
         Dictionary with key being dataset.column and dataframes being values
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export image
     external_axes:Optional[List[plt.axes]]
@@ -129,6 +129,7 @@ def display_plot(
         export,
         os.path.dirname(os.path.abspath(__file__)),
         "plot",
+        sheet_name,
     )
 
 
@@ -137,8 +138,9 @@ def display_norm(
     data: pd.Series,
     dataset: str = "",
     column: str = "",
-    plot: bool = False,
+    plot: bool = True,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.axes]] = None,
 ):
     """Determine the normality of a timeseries.
@@ -153,6 +155,8 @@ def display_norm(
         Column for y data
     plot : bool
         Whether you wish to plot a histogram
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data.
     external_axes: Optional[List[plt.axes]]
@@ -195,6 +199,7 @@ def display_norm(
                 os.path.dirname(os.path.abspath(__file__)),
                 f"{column}_{dataset}_norm",
                 results,
+                sheet_name,
             )
         else:
             console.print()
@@ -208,6 +213,7 @@ def display_root(
     fuller_reg: str = "c",
     kpss_reg: str = "c",
     export: str = "",
+    sheet_name: str = None,
 ):
     """Determine the normality of a timeseries.
 
@@ -223,6 +229,8 @@ def display_root(
         Type of regression of ADF test. Choose c, ct, ctt, or nc
     kpss_reg : str
         Type of regression for KPSS test. Choose c or ct
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data.
     """
@@ -247,6 +255,7 @@ def display_root(
             os.path.dirname(os.path.abspath(__file__)),
             f"{dataset}_{column}_root",
             results,
+            sheet_name,
         )
 
 
@@ -257,6 +266,7 @@ def display_granger(
     lags: int = 3,
     confidence_level: float = 0.05,
     export: str = "",
+    sheet_name: str = None,
 ):
     """Show granger tests
 
@@ -284,20 +294,9 @@ def display_granger(
             f"{independent_series.dtype}. Consider using the command 'type' to change this."
         )
     else:
-        granger = econometrics_model.get_granger_causality(
+        granger_df = econometrics_model.get_granger_causality(
             dependent_series, independent_series, lags
         )
-
-        for test in granger[lags][0]:
-            # As ssr_chi2test and lrtest have one less value in the tuple, we fill
-            # this value with a '-' to allow the conversion to a DataFrame
-            if len(granger[lags][0][test]) != 4:
-                pars = granger[lags][0][test]
-                granger[lags][0][test] = (pars[0], pars[1], "-", pars[2])
-
-        granger_df = pd.DataFrame(
-            granger[lags][0], index=["F-test", "P-value", "Count", "Lags"]
-        ).T
 
         print_rich_table(
             granger_df,
@@ -306,7 +305,7 @@ def display_granger(
             title=f"Granger Causality Test [Y: {dependent_series.name} | X: {independent_series.name} | Lags: {lags}]",
         )
 
-        result_ftest = round(granger[lags][0]["params_ftest"][1], 3)
+        result_ftest = round(granger_df.loc["params_ftest"]["P-value"], 3)
 
         if result_ftest > confidence_level:
             console.print(
@@ -325,15 +324,17 @@ def display_granger(
             os.path.dirname(os.path.abspath(__file__)),
             f'{dependent_series.name.replace(".","-")}_{independent_series.name.replace(".","-")}_granger',
             granger_df,
+            sheet_name,
         )
 
 
 @log_start_end(log=logger)
 def display_cointegration_test(
-    datasets: Union[pd.DataFrame, Dict[str, pd.Series]],
+    *datasets: pd.Series,
     significant: bool = False,
-    plot: bool = False,
+    plot: bool = True,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.axes]] = None,
 ):
     """Estimates long-run and short-run cointegration relationship for series y and x and apply
@@ -355,8 +356,8 @@ def display_cointegration_test(
 
     Parameters
     ----------
-    datasets: Union[pd.DataFrame, Dict[str, pd.Series]]
-        All time series to perform co-integration tests on.
+    datasets: pd.Series
+        Variable number of series to test for cointegration
     significant: float
         Show only companies that have p-values lower than this percentage
     plot: bool
@@ -366,85 +367,50 @@ def display_cointegration_test(
     external_axes:Optional[List[plt.axes]]
         External axes to plot on
     """
+    if len(datasets) < 2:
+        console.print("[red]Co-integration requires at least two time series.[/red]")
+        return
 
-    pairs = list(combinations(datasets.keys(), 2))
-    result: Dict[str, list] = {}
-    z_values: Dict[str, pd.Series] = {}
+    df: pd.DataFrame = econometrics_model.get_coint_df(*datasets)
 
-    for x, y in pairs:
-        if sum(datasets[y].isnull()) > 0:
-            console.print(
-                f"The Series {y} has nan-values. Please consider dropping or filling these "
-                f"values with 'clean'."
-            )
-        elif sum(datasets[x].isnull()) > 0:
-            console.print(
-                f"The Series {x} has nan-values. Please consider dropping or filling these "
-                f"values with 'clean'."
-            )
-        elif not datasets[y].index.equals(datasets[x].index):
-            console.print(f"The Series {y} and {x} do not have the same index.")
+    if significant:
+        console.print(
+            f"Only showing pairs that are statistically significant ({significant} > p-value)."
+        )
+        df = df[significant > df["P Value"]]
+        console.print()
+
+    print_rich_table(
+        df,
+        headers=list(df.columns),
+        show_index=True,
+        index_name="Pairs",
+        title="Cointegration Tests",
+    )
+
+    if plot:
+        if external_axes is None:
+            _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
         else:
-            try:
-                (
-                    c,
-                    gamma,
-                    alpha,
-                    z,
-                    adfstat,
-                    pvalue,
-                ) = econometrics_model.get_engle_granger_two_step_cointegration_test(
-                    datasets[x], datasets[y]
-                )
-                result[f"{x}/{y}"] = [c, gamma, alpha, adfstat, pvalue]
-                z_values[f"{x}/{y}"] = z
-            except ValueError:
-                console.print(
-                    "[red]Error: please only send string and integer columns[/red]\n"
-                )
+            ax = external_axes[0]
 
-    if result and z_values:
-        df = pd.DataFrame.from_dict(
-            result,
-            orient="index",
-            columns=["Constant", "Gamma", "Alpha", "Dickey-Fuller", "P Value"],
-        )
+        z_values = econometrics_model.get_coint_df(*datasets, return_z=True)
 
-        if significant:
-            console.print(
-                f"Only showing pairs that are statistically significant ({significant} > p-value)."
-            )
-            df = df[significant > df["P Value"]]
-            console.print()
+        for pair, values in z_values.items():
+            ax.plot(values, label=pair)
 
-        print_rich_table(
-            df,
-            headers=list(df.columns),
-            show_index=True,
-            index_name="Pairs",
-            title="Cointegration Tests",
-        )
+        ax.legend()
+        ax.set_title("Error correction terms")
 
-        if plot:
-            if external_axes is None:
-                _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-            else:
-                ax = external_axes[0]
+        theme.style_primary_axis(ax)
 
-            for pair, values in z_values.items():
-                ax.plot(values, label=pair)
-
-            ax.legend()
-            ax.set_title("Error correction terms")
-
-            theme.style_primary_axis(ax)
-
-            if external_axes is None:
-                theme.visualize_output()
+        if external_axes is None:
+            theme.visualize_output()
 
         export_data(
             export,
             os.path.dirname(os.path.abspath(__file__)),
             "coint",
             df,
+            sheet_name,
         )

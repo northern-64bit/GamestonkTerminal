@@ -1,7 +1,7 @@
 """Parent Classes."""
 __docformat__ = "numpy"
 
-# pylint: disable=C0301,C0302,R0902,global-statement
+# pylint: disable=C0301,C0302,R0902,global-statement,too-many-boolean-expressions
 
 import argparse
 import difflib
@@ -33,9 +33,7 @@ from openbb_terminal.helper_funcs import (
     check_positive,
     export_data,
     get_flair,
-    load_json,
     parse_and_split_input,
-    parse_simple_args,
     prefill_form,
     screenshot,
     search_wikipedia,
@@ -48,6 +46,7 @@ from openbb_terminal.rich_config import console, get_ordered_list_sources
 from openbb_terminal.stocks import stocks_helper
 from openbb_terminal.terminal_helper import open_openbb_documentation
 from openbb_terminal.cryptocurrency import cryptocurrency_helpers
+from openbb_terminal.core.completer.choices import build_controller_choice_map
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +90,6 @@ class BaseController(metaclass=ABCMeta):
         "r",
         "reset",
         "support",
-        "glossary",
         "wiki",
         "record",
         "stop",
@@ -102,11 +100,22 @@ class BaseController(metaclass=ABCMeta):
     CHOICES_MENUS: List[str] = []
     SUPPORT_CHOICES: dict = {}
     ABOUT_CHOICES: dict = {}
+    NEWS_CHOICES: dict = {}
     COMMAND_SEPARATOR = "/"
     KEYS_MENU = "keys" + COMMAND_SEPARATOR
     TRY_RELOAD = False
     PATH: str = ""
     FILE_PATH: str = ""
+    CHOICES_GENERATION = False
+
+    @property
+    def choices_default(self):
+        if self.CHOICES_GENERATION:
+            choices = build_controller_choice_map(controller=self)
+        else:
+            choices = {}
+
+        return choices
 
     def __init__(self, queue: List[str] = None) -> None:
         """Create the base class for any controller in the codebase.
@@ -152,6 +161,7 @@ class BaseController(metaclass=ABCMeta):
             c for c in self.controller_choices if c not in self.CHOICES_COMMON
         ]
 
+        # Add in support options
         support_choices: dict = {c: {} for c in self.controller_choices}
 
         support_choices = {c: None for c in (["generic"] + self.support_commands)}
@@ -165,6 +175,10 @@ class BaseController(metaclass=ABCMeta):
         support_choices["--type"] = {c: None for c in (SUPPORT_TYPE)}
 
         self.SUPPORT_CHOICES = support_choices
+
+        # Add in news options
+        news_choices = ["--term", "-t", "--sources", "-s", "--help", "-h"]
+        self.NEWS_CHOICES = {c: None for c in news_choices}
 
     def check_path(self) -> None:
         """Check if command path is valid."""
@@ -243,7 +257,7 @@ class BaseController(metaclass=ABCMeta):
             User input string
 
         Returns
-        -------
+        ----------
         list
             Command queue as list
         """
@@ -300,7 +314,7 @@ class BaseController(metaclass=ABCMeta):
         """Process and dispatch input.
 
         Returns
-        -------
+        ----------
         List[str]
             list of commands in the queue to execute
         """
@@ -314,7 +328,6 @@ class BaseController(metaclass=ABCMeta):
 
         # Navigation slash is being used first split commands
         elif len(actions) > 1:
-
             # Absolute path is specified
             if not actions[0]:
                 actions[0] = "home"
@@ -400,7 +413,7 @@ class BaseController(metaclass=ABCMeta):
             dest="command",
             default=None,
             help="Obtain documentation on the given command or menu",
-            choices=self.CHOICES_COMMANDS + self.CHOICES_MENUS,
+            choices=self.CHOICES_COMMANDS + self.CHOICES_MENUS + self.CHOICES_COMMON,
         )
 
         if other_args and "-" not in other_args[0][0]:
@@ -408,7 +421,15 @@ class BaseController(metaclass=ABCMeta):
         ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         if ns_parser:
-            open_openbb_documentation(self.PATH, command=ns_parser.command)
+            arg_type = ""
+            if ns_parser.command in self.CHOICES_COMMANDS:
+                arg_type = "command"
+            elif ns_parser.command in self.CHOICES_MENUS:
+                arg_type = "menu"
+
+            open_openbb_documentation(
+                self.PATH, command=ns_parser.command, arg_type=arg_type
+            )
 
     @log_start_end(log=logger)
     def call_quit(self, _) -> None:
@@ -443,20 +464,28 @@ class BaseController(metaclass=ABCMeta):
                 self.queue.insert(0, "quit")
 
     @log_start_end(log=logger)
-    def call_resources(self, _) -> None:
+    def call_resources(self, other_args: List[str]) -> None:
         """Process resources command."""
-        if os.path.isfile(self.FILE_PATH):
-            with open(self.FILE_PATH) as f:
-                console.print(Markdown(f.read()))
-            console.print("")
-        else:
-            console.print("No resources available.\n")
+        parser = argparse.ArgumentParser(
+            add_help=False,
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog="resources",
+            description="Display available markdown resources.",
+        )
+        ns_parser = self.parse_simple_args(parser, other_args)
+
+        if ns_parser:
+            if os.path.isfile(self.FILE_PATH):
+                with open(self.FILE_PATH) as f:
+                    console.print(Markdown(f.read()))
+
+            else:
+                console.print("No resources available.\n")
 
     @log_start_end(log=logger)
     def call_support(self, other_args: List[str]) -> None:
         """Process support command."""
         self.save_class()
-        console.print("")
 
         path_split = [x for x in self.PATH.split("/") if x != ""]
         main_menu = path_split[0] if len(path_split) else "home"
@@ -504,7 +533,7 @@ class BaseController(metaclass=ABCMeta):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-c")
 
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
 
         if ns_parser:
             prefill_form(
@@ -514,42 +543,6 @@ class BaseController(metaclass=ABCMeta):
                 message=" ".join(ns_parser.msg),
                 path=self.PATH,
             )
-
-    @log_start_end(log=logger)
-    def call_glossary(self, other_args: List[str]) -> None:
-        """Process glossary command."""
-        parser = argparse.ArgumentParser(
-            add_help=False,
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            prog="support",
-            description="Submit your support request",
-        )
-        parser.add_argument(
-            "-w",
-            "--word",
-            action="store",
-            dest="word",
-            type=str,
-            required="-h" not in other_args,
-            help="Word that you want defined",
-        )
-        if other_args and "-" not in other_args[0][0]:
-            other_args.insert(0, "-w")
-
-        ns_parser = parse_simple_args(parser, other_args)
-
-        glossary_file = os.path.join(os.path.dirname(__file__), "glossary.json")
-        glossary_dict = load_json(glossary_file)
-
-        if ns_parser:
-            word = glossary_dict.get(ns_parser.word, "")
-            word = word.lower()
-            word = word.replace("--", "")
-            word = word.replace("-", " ")
-            if word:
-                console.print(word + "\n")
-            else:
-                console.print("Word is not in the glossary.\n")
 
     @log_start_end(log=logger)
     def call_wiki(self, other_args: List[str]) -> None:
@@ -573,7 +566,7 @@ class BaseController(metaclass=ABCMeta):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-e")
 
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
 
         if ns_parser:
             if ns_parser.expression:
@@ -600,7 +593,7 @@ class BaseController(metaclass=ABCMeta):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-r")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
 
         if ns_parser:
             global SESSION_RECORDED_NAME
@@ -663,13 +656,56 @@ class BaseController(metaclass=ABCMeta):
             "Default target is plot if there is one open, otherwise it's terminal window. "
             " In case the user wants the terminal window, it can be forced with '-t` or '--terminal' flag passed.",
         )
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
 
         if ns_parser:
             screenshot()
 
+    @staticmethod
+    def parse_simple_args(parser: argparse.ArgumentParser, other_args: List[str]):
+        """Parse list of arguments into the supplied parser.
+
+        Parameters
+        ----------
+        parser: argparse.ArgumentParser
+            Parser with predefined arguments
+        other_args: List[str]
+            List of arguments to parse
+
+        Returns
+        -------
+        ns_parser:
+            Namespace with parsed arguments
+        """
+        parser.add_argument(
+            "-h", "--help", action="store_true", help="show this help message"
+        )
+
+        if obbff.USE_CLEAR_AFTER_CMD:
+            system_clear()
+
+        try:
+            (ns_parser, l_unknown_args) = parser.parse_known_args(other_args)
+        except SystemExit:
+            # In case the command has required argument that isn't specified
+            console.print("\n")
+            return None
+
+        if ns_parser.help:
+            txt_help = parser.format_help()
+            console.print(f"[help]{txt_help}[/help]")
+            return None
+
+        if l_unknown_args:
+            console.print(
+                f"The following args couldn't be interpreted: {l_unknown_args}\n"
+            )
+
+        return ns_parser
+
+    @classmethod
     def parse_known_args_and_warn(
-        self,
+        cls,
         parser: argparse.ArgumentParser,
         other_args: List[str],
         export_allowed: int = NO_EXPORT,
@@ -693,7 +729,7 @@ class BaseController(metaclass=ABCMeta):
             Add a --limit flag with this number default
 
         Returns
-        -------
+        ----------
         ns_parser:
             Namespace with parsed arguments
         """
@@ -722,6 +758,19 @@ class BaseController(metaclass=ABCMeta):
                 help=help_export,
             )
 
+            # If excel is an option, add the sheet name
+            if export_allowed in [
+                EXPORT_ONLY_RAW_DATA_ALLOWED,
+                EXPORT_BOTH_RAW_DATA_AND_FIGURES,
+            ]:
+                parser.add_argument(
+                    "--sheet-name",
+                    dest="sheet_name",
+                    default=None,
+                    nargs="+",
+                    help="Name of excel sheet to save data to. Only valid for .xlsx files.",
+                )
+
         if raw:
             parser.add_argument(
                 "--raw",
@@ -739,7 +788,7 @@ class BaseController(metaclass=ABCMeta):
                 help="Number of entries to show in data.",
                 type=check_positive,
             )
-        sources = get_ordered_list_sources(f"{self.PATH}{parser.prog}")
+        sources = get_ordered_list_sources(f"{cls.PATH}{parser.prog}")
         # Allow to change source if there is more than one
         if len(sources) > 1:
             parser.add_argument(
@@ -758,7 +807,7 @@ class BaseController(metaclass=ABCMeta):
             (ns_parser, l_unknown_args) = parser.parse_known_args(other_args)
         except SystemExit:
             # In case the command has required argument that isn't specified
-            console.print("")
+
             return None
 
         if ns_parser.help:
@@ -876,7 +925,7 @@ class BaseController(metaclass=ABCMeta):
                         self.PATH,
                     )
                 console.print(
-                    f"[red]The command '{an_input}' doesn't exist on the {self.PATH} menu.[/red]",
+                    f"[red]The command '{an_input}' doesn't exist on the {self.PATH} menu.[/red]\n",
                 )
                 similar_cmd = difflib.get_close_matches(
                     an_input.split(" ")[0] if " " in an_input else an_input,
@@ -900,7 +949,7 @@ class BaseController(metaclass=ABCMeta):
                         an_input = similar_cmd[0]
                     if not self.contains_keys(an_input):
                         logger.warning("Replacing by %s", an_input)
-                    console.print(f"\n[green]Replacing by '{an_input}'.[/green]\n")
+                    console.print(f"[green]Replacing by '{an_input}'.[/green]\n")
                     self.queue.insert(0, an_input)
                 else:
                     if self.TRY_RELOAD and obbff.RETRY_WITH_LOAD:
@@ -929,7 +978,7 @@ class StockBaseController(BaseController, metaclass=ABCMeta):
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             prog="load",
             description="Load stock ticker to perform analysis on. When the data source"
-            + " is syf', an Indian ticker can be"
+            + " is yf, an Indian ticker can be"
             + " loaded by using '.NS' at the end, e.g. 'SBIN.NS'. See available market in"
             + " https://help.yahoo.com/kb/exchanges-data-providers-yahoo-finance-sln2310.html.",
         )
@@ -1008,7 +1057,20 @@ class StockBaseController(BaseController, metaclass=ABCMeta):
             type=str,
             default="ytd",
         )
-
+        parser.add_argument(
+            "--exchange",
+            dest="exchange",
+            action="store_true",
+            default=False,
+            help="Show exchange information.",
+        )
+        parser.add_argument(
+            "--performance",
+            dest="performance",
+            action="store_true",
+            default=False,
+            help="Show performance information.",
+        )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-t")
 
@@ -1055,19 +1117,26 @@ class StockBaseController(BaseController, metaclass=ABCMeta):
                 )
                 if df_stock_candidate.empty:
                     return
-            if not df_stock_candidate.empty:
+            is_df = isinstance(df_stock_candidate, pd.DataFrame)
+            if not (
+                (is_df and df_stock_candidate.empty)
+                or (not is_df and not df_stock_candidate)
+            ):
                 self.stock = df_stock_candidate
-                self.add_info = stocks_helper.additional_info_about_ticker(
-                    ns_parser.ticker
-                )
-                console.print(self.add_info)
+                if ns_parser.exchange:
+                    self.add_info = stocks_helper.additional_info_about_ticker(
+                        ns_parser.ticker
+                    )
+                    console.print(self.add_info)
                 if (
                     ns_parser.interval == 1440
                     and not ns_parser.weekly
                     and not ns_parser.monthly
                     and ns_parser.filepath is None
                     and self.PATH == "/stocks/"
+                    and ns_parser.performance
                 ):
+                    console.print()
                     stocks_helper.show_quick_performance(self.stock, ns_parser.ticker)
                 if "." in ns_parser.ticker:
                     self.ticker, self.suffix = ns_parser.ticker.upper().split(".")
@@ -1098,8 +1167,11 @@ class StockBaseController(BaseController, metaclass=ABCMeta):
                 export_data(
                     ns_parser.export,
                     os.path.dirname(os.path.abspath(__file__)),
-                    "load",
+                    f"load_{self.ticker}",
                     self.stock.copy(),
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
 
 
@@ -1202,9 +1274,9 @@ class CryptoBaseController(BaseController, metaclass=ABCMeta):
                     ns_parser.vs = "usd"
             (self.current_df) = cryptocurrency_helpers.load(
                 symbol=ns_parser.coin.lower(),
-                vs_currency=ns_parser.vs,
-                end_date=ns_parser.end,
-                start_date=ns_parser.start,
+                to_symbol=ns_parser.vs,
+                end_date=ns_parser.end.strftime("%Y-%m-%d"),
+                start_date=ns_parser.start.strftime("%Y-%m-%d"),
                 interval=ns_parser.interval,
                 source=ns_parser.source,
                 exchange=ns_parser.exchange,
@@ -1229,4 +1301,7 @@ class CryptoBaseController(BaseController, metaclass=ABCMeta):
                     os.path.dirname(os.path.abspath(__file__)),
                     "load",
                     self.current_df.copy(),
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )

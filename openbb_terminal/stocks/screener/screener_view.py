@@ -2,14 +2,16 @@
 __docformat__ = "numpy"
 
 import configparser
-from pathlib import Path
 
 from openbb_terminal.rich_config import console
-from openbb_terminal.core.config.paths import USER_PRESETS_DIRECTORY
+from openbb_terminal.core.config.paths import (
+    USER_PRESETS_DIRECTORY,
+    MISCELLANEOUS_DIRECTORY,
+)
 from openbb_terminal.stocks.screener import finviz_model
 
 PRESETS_PATH = USER_PRESETS_DIRECTORY / "stocks" / "screener"
-PRESETS_PATH_DEFAULT = Path(__file__).parent / "presets"
+PRESETS_PATH_DEFAULT = MISCELLANEOUS_DIRECTORY / "stocks" / "screener"
 preset_choices = {
     filepath.name: filepath
     for filepath in PRESETS_PATH.iterdir()
@@ -32,16 +34,18 @@ def display_presets(preset: str):
 
         filters_headers = ["General", "Descriptive", "Fundamental", "Technical"]
 
-        console.print("")
-        for filter_header in filters_headers:
+        for i, filter_header in enumerate(filters_headers):
             console.print(f" - {filter_header} -")
             d_filters = {**preset_filter[filter_header]}
             d_filters = {k: v for k, v in d_filters.items() if v}
+
             if d_filters:
                 max_len = len(max(d_filters, key=len))
                 for key, value in d_filters.items():
                     console.print(f"{key}{(max_len-len(key))*' '}: {value}")
-            console.print("")
+
+            if i < len(filters_headers) - 1:
+                console.print("\n")
 
     else:
         console.print("\nCustom Presets:")

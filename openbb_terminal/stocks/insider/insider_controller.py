@@ -5,19 +5,21 @@ import argparse
 import configparser
 import logging
 from typing import List
+
 import pandas as pd
-from openbb_terminal.custom_prompt_toolkit import NestedCompleter
+
 from openbb_terminal import feature_flags as obbff
+from openbb_terminal.custom_prompt_toolkit import NestedCompleter
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.helper_funcs import EXPORT_ONLY_RAW_DATA_ALLOWED, check_positive
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import StockBaseController
-from openbb_terminal.rich_config import console, MenuText
+from openbb_terminal.rich_config import MenuText, console
 from openbb_terminal.stocks.insider import (
     businessinsider_view,
     finviz_view,
-    openinsider_view,
     openinsider_model,
+    openinsider_view,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,6 +67,7 @@ class InsiderController(StockBaseController):
     preset_choices = openinsider_model.get_preset_choices()
 
     PATH = "/stocks/ins/"
+    CHOICES_GENERATION = True
 
     def __init__(
         self,
@@ -84,54 +87,7 @@ class InsiderController(StockBaseController):
         self.preset = "whales"
 
         if session and obbff.USE_PROMPT_TOOLKIT:
-            choices: dict = {c: {} for c in self.controller_choices}
-
-            one_to_hundred: dict = {str(c): {} for c in range(1, 100)}
-            choices["view"] = {c: {} for c in self.preset_choices}
-            choices["set"] = {c: {} for c in self.preset_choices}
-            choices["filter"] = {
-                "--urls": {},
-                "-u": "--urls",
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            limit = {
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            choices["lcb"] = limit
-            choices["lpsb"] = limit
-            choices["lit"] = limit
-            choices["lip"] = limit
-            choices["blip"] = limit
-            choices["blop"] = limit
-            choices["blcp"] = limit
-            choices["lis"] = limit
-            choices["blis"] = limit
-            choices["blos"] = limit
-            choices["blcs"] = limit
-            choices["topt"] = limit
-            choices["toppw"] = limit
-            choices["toppm"] = limit
-            choices["tipt"] = limit
-            choices["lcb"] = limit
-            choices["tippw"] = limit
-            choices["tippm"] = limit
-            choices["tist"] = limit
-            choices["tispw"] = limit
-            choices["tispm"] = limit
-            choices["stats"] = {
-                "--urls": {},
-                "-u": "--urls",
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            choices["act"] = {
-                "--raw": {},
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            choices["lins"] = limit
+            choices: dict = self.choices_default
 
             self.completer = NestedCompleter.from_nested_dict(choices)
 
@@ -152,7 +108,7 @@ class InsiderController(StockBaseController):
         mt.add_cmd("lip")
         mt.add_cmd("blip")
         mt.add_cmd("blop")
-        mt.add_cmd("bclp")
+        mt.add_cmd("blcp")
         mt.add_cmd("lis")
         mt.add_cmd("blis")
         mt.add_cmd("blos")
@@ -313,6 +269,9 @@ class InsiderController(StockBaseController):
                 limit=ns_parser.limit,
                 links=ns_parser.urls,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -354,6 +313,9 @@ class InsiderController(StockBaseController):
                     limit=ns_parser.limit,
                     links=ns_parser.urls,
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print("Please use `load <ticker>` before.\n")
@@ -948,6 +910,9 @@ class InsiderController(StockBaseController):
                     limit=ns_parser.limit,
                     raw=ns_parser.raw,
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print("No ticker loaded. First use `load {ticker}`\n")
@@ -983,6 +948,9 @@ class InsiderController(StockBaseController):
                     symbol=self.ticker,
                     limit=ns_parser.limit,
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print("No ticker loaded. First use `load {ticker}`\n")

@@ -30,9 +30,10 @@ def display_terra_asset_history(
     asset: str = "",
     address: str = "",
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
-    """Displays the 30-day history of specified asset in terra address
+    """Plots the 30-day history of specified asset in terra address
     [Source: https://terra.engineer/]
 
     Parameters
@@ -78,14 +79,17 @@ def display_terra_asset_history(
         os.path.dirname(os.path.abspath(__file__)),
         "aterra",
         df,
+        sheet_name,
     )
 
 
 @log_start_end(log=logger)
 def display_anchor_yield_reserve(
-    export: str = "", external_axes: Optional[List[plt.Axes]] = None
+    export: str = "",
+    sheet_name: str = None,
+    external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
-    """Displays the 30-day history of the Anchor Yield Reserve.
+    """Plots the 30-day history of the Anchor Yield Reserve.
     [Source: https://terra.engineer/]
 
     Parameters
@@ -126,4 +130,5 @@ def display_anchor_yield_reserve(
         os.path.dirname(os.path.abspath(__file__)),
         "ayr",
         df,
+        sheet_name,
     )

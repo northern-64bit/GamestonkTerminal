@@ -158,6 +158,7 @@ class SectorIndustryAnalysisController(BaseController):
         "trailing",
     ]
     PATH = "/stocks/sia/"
+    CHOICES_GENERATION = True
 
     def __init__(
         self,
@@ -181,41 +182,7 @@ class SectorIndustryAnalysisController(BaseController):
         self.currency: str = ""
 
         if session and obbff.USE_PROMPT_TOOLKIT:
-            choices: dict = {c: {} for c in self.controller_choices}
-            choices["select"] = {
-                "--ticker": None,
-                "-t": "--ticker",
-            }
-            choices["mktcap"] = {c: {} for c in self.mktcap_choices}
-            choices["period"] = {c: {} for c in self.period_choices}
-            choices["clear"] = {c: {} for c in self.clear_choices}
-            choices["clear"]["--param"] = {c: {} for c in self.clear_choices}
-            choices["clear"]["-p"] = "--param"
-            standard_cp = {
-                "--raw": {},
-                "-r": "--raw",
-            }
-            choices["cps"] = standard_cp
-            choices["cpic"] = standard_cp
-            choices["cpis"] = standard_cp
-            choices["cpcs"] = standard_cp
-            choices["cpci"] = standard_cp
-            choices["metric"] = {
-                "--metric": {c: {} for c in self.metric_choices},
-                "-m": "--metric",
-                "--raw": {},
-                "-r": "--raw",
-            }
-            choices["vis"] = {
-                "--metric": {c: {} for c in self.vis_choices},
-                "-m": "--metric",
-                "--currency": None,
-                "-c": "--currency",
-                "--raw": {},
-            }
-
-            choices["support"] = self.SUPPORT_CHOICES
-            choices["about"] = self.ABOUT_CHOICES
+            choices: dict = self.choices_default
 
             # This menu contains dynamic choices that may change during runtime
             self.choices = choices
@@ -326,7 +293,7 @@ class SectorIndustryAnalysisController(BaseController):
 
     def __load(self):
         if self.ticker:
-            data = yf.utils.get_json(f"https://finance.yahoo.com/quote/{self.ticker}")
+            data = financedatabase_model.get_json(self.ticker)
 
             if "summaryProfile" not in data or data["summaryProfile"] is None:
                 raise Exception(
@@ -713,7 +680,41 @@ class SectorIndustryAnalysisController(BaseController):
             add_help=False,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             prog="metric",
-            description="Visualize a particular metric with the filters selected",
+            description=" Visualize a particular metric with the filters selected"
+            " Available Metrics:"
+            "    roa           return on assets"
+            "    roe           return on equity"
+            "    cr            current ratio"
+            "    qr            quick ratio"
+            "    de            debt to equity"
+            "    tc            total cash"
+            "    tcs           total cash per share"
+            "    tr            total revenue"
+            "    rps           revenue per share"
+            "    rg            revenue growth"
+            "    eg            earnings growth"
+            "    pm            profit margins"
+            "    gp            gross profits"
+            "    gm            gross margins"
+            "    ocf           operating cash flow"
+            "    om            operating margins"
+            "    fcf           free cash flow"
+            "    td            total debt"
+            "    ebitda        earnings before interest, taxes, depreciation and amortization"
+            "    ebitdam       ebitda margins"
+            "    rec           recommendation mean"
+            "    mc            market cap"
+            "    fte           full time employees"
+            "    er            enterprise to revenue"
+            "    bv            book value"
+            "    ss            shares short"
+            "    pb            price to book"
+            "    beta          beta"
+            "    fs            float shares"
+            "    sr            short ratio"
+            "    peg           peg ratio"
+            "    ev            enterprise value"
+            "    fpe           forward P/E,",
         )
         parser.add_argument(
             "-m",
@@ -742,50 +743,10 @@ class SectorIndustryAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-m")
 
-        if not other_args:
-            help_text = """Available Metrics:
-    roa           return on assets
-    roe           return on equity
-    cr            current ratio
-    qr            quick ratio
-    de            debt to equity
-    tc            total cash
-    tcs           total cash per share
-    tr            total revenue
-    rps           revenue per share
-    rg            revenue growth
-    eg            earnings growth
-    pm            profit margins
-    gp            gross profits
-    gm            gross margins
-    ocf           operating cash flow
-    om            operating margins
-    fcf           free cash flow
-    td            total debt
-    ebitda        earnings before interest, taxes, depreciation and amortization
-    ebitdam       ebitda margins
-    rec           recommendation mean
-    mc            market cap
-    fte           full time employees
-    er            enterprise to revenue
-    bv            book value
-    ss            shares short
-    pb            price to book
-    beta          beta
-    fs            float shares
-    sr            short ratio
-    peg           peg ratio
-    ev            enterprise value
-    fpe           forward P/E
-            """
-            console.print(help_text)
-            return
-
         ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
-
             if not self.country and not self.sector and not self.industry:
                 console.print(
                     "[red]Select at least one filter from sector, country or industry.[/red]\n"
@@ -808,6 +769,9 @@ class SectorIndustryAnalysisController(BaseController):
                         self.exclude_exchanges,
                         ns_parser.limit,
                         ns_parser.export,
+                        " ".join(ns_parser.sheet_name)
+                        if ns_parser.sheet_name
+                        else None,
                         ns_parser.raw,
                         self.stocks_data,
                     )
@@ -820,11 +784,24 @@ class SectorIndustryAnalysisController(BaseController):
     @log_start_end(log=logger)
     def call_vis(self, other_args: List[str]):
         """Process vis command"""
+
+        statement_string = {
+            "BS": "Balance Sheet Statement",
+            "IS": "Income Statement",
+            "CF": "Cash Flow Statement",
+        }
+        help_text = "Visualize a particular metric with the filters selected\n"
+
+        for statement, statement_value in stockanalysis_model.SA_KEYS.items():
+            help_text += f"\n{statement_string[statement]}\n"
+            for k, v in statement_value.items():
+                help_text += f"  {k} {(10 - len(k)) * ' '} {v} \n"
+
         parser = argparse.ArgumentParser(
             add_help=False,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             prog="vis",
-            description="Visualize a particular metric with the filters selected",
+            description=help_text,
         )
         parser.add_argument(
             "-m",
@@ -854,27 +831,10 @@ class SectorIndustryAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-m")
 
-        if not other_args:
-            statement_string = {
-                "BS": "Balance Sheet Statement",
-                "IS": "Income Statement",
-                "CF": "Cash Flow Statement",
-            }
-            help_text = ""
-
-            for statement, statement_value in stockanalysis_model.SA_KEYS.items():
-                help_text += f"\n{statement_string[statement]}\n"
-                for k, v in statement_value.items():
-                    help_text += f"  {k} {(10 - len(k)) * ' '} {v} \n"
-
-            console.print(help_text)
-            return
-
         ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES, limit=10, raw=True
         )
         if ns_parser:
-
             if not self.country and not self.sector and not self.industry:
                 console.print(
                     "[red]Select at least one filter from sector, country or industry.[/red]\n"
@@ -901,6 +861,9 @@ class SectorIndustryAnalysisController(BaseController):
                         exclude_exchanges=self.exclude_exchanges,
                         limit=ns_parser.limit,
                         export=ns_parser.export,
+                        sheet_name=" ".join(ns_parser.sheet_name)
+                        if ns_parser.sheet_name
+                        else None,
                         raw=ns_parser.raw,
                         already_loaded_stocks_data=self.stocks_data,
                     )
@@ -958,6 +921,7 @@ class SectorIndustryAnalysisController(BaseController):
                     self.mktcap,
                     self.exclude_exchanges,
                     ns_parser.export,
+                    " ".join(ns_parser.sheet_name) if ns_parser.sheet_name else None,
                     ns_parser.raw,
                     ns_parser.max_sectors_to_display,
                     ns_parser.min_pct_to_display_sector,

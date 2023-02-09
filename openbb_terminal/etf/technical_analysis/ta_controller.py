@@ -27,6 +27,7 @@ from openbb_terminal.common.technical_analysis import (
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.helper_funcs import (
     EXPORT_BOTH_RAW_DATA_AND_FIGURES,
+    check_non_negative,
     check_positive,
     check_positive_list,
     valid_date,
@@ -43,7 +44,6 @@ class TechnicalAnalysisController(BaseController):
     """Technical Analysis Controller class"""
 
     CHOICES_COMMANDS = [
-        "load",
         "ema",
         "sma",
         "wma",
@@ -65,13 +65,13 @@ class TechnicalAnalysisController(BaseController):
         "adosc",
         "obv",
         "fib",
-        "tv",
         "clenow",
         "demark",
         "atr",
     ]
 
     PATH = "/etf/ta/"
+    CHOICES_GENERATION = True
 
     def __init__(
         self,
@@ -88,113 +88,7 @@ class TechnicalAnalysisController(BaseController):
         self.data = data
         self.interval = "1440min"
         if session and obbff.USE_PROMPT_TOOLKIT:
-            choices: dict = {c: {} for c in self.controller_choices}
-
-            one_to_hundred: dict = {str(c): {} for c in range(1, 100)}
-            zero_to_hundred: dict = {str(c): {} for c in range(0, 100)}
-            ma = {
-                "--length": None,
-                "-l": "--length",
-                "--offset": zero_to_hundred,
-                "-o": "--offset",
-            }
-            choices["ema"] = ma
-            choices["sma"] = ma
-            choices["wma"] = ma
-            choices["hma"] = ma
-            choices["zlma"] = ma
-            choices["vwap"] = {
-                "--offset": zero_to_hundred,
-                "-o": "--offset",
-                "--start": None,
-                "--end": None,
-            }
-            choices["cci"] = {
-                "--length": one_to_hundred,
-                "-l": "--length",
-                "--scalar": None,
-                "-s": "--scalar",
-            }
-            choices["macd"] = {
-                "--fast": one_to_hundred,
-                "--slow": "--fast",
-                "--signal": "--fast",
-            }
-            choices["cci"] = {
-                "--length": one_to_hundred,
-                "-l": "--length",
-                "--scalar": None,
-                "-s": "--scalar",
-                "--drift": "--length",
-                "-d": "--drift",
-            }
-            choices["stoch"] = {
-                "--fastkperiod": one_to_hundred,
-                "-k": "--fastkperiod",
-                "--slowdperiod": "--fastkperiod",
-                "-d": "--slowdperiod",
-                "--slowkperiod": "--fastkperiod",
-            }
-            choices["fisher"] = {
-                "--length": one_to_hundred,
-                "-l": "--length",
-            }
-            choices["cg"] = {
-                "--length": one_to_hundred,
-                "-l": "--length",
-            }
-            choices["adx"] = {
-                "--length": one_to_hundred,
-                "-l": "--length",
-                "--scalar": None,
-                "-s": "--scalar",
-                "--drift": "--length",
-                "-d": "--drift",
-            }
-            choices["aroon"] = {
-                "--length": one_to_hundred,
-                "-l": "--length",
-                "--scalar": None,
-                "-s": "--scalar",
-            }
-            choices["bbands"] = {
-                "--length": one_to_hundred,
-                "-l": "--length",
-                "--std": {str(c): {} for c in np.arange(0.0, 10, 0.25)},
-                "-s": "--std",
-                "--mamode": {c: {} for c in volatility_model.MAMODES},
-                "-m": "--mamode",
-            }
-            choices["donchian"] = {
-                "--length_upper": one_to_hundred,
-                "-u": "--length_upper",
-                "--length_lower": "--length_upper",
-                "-l": "--length_lower",
-            }
-            choices["kc"] = {
-                "--length": one_to_hundred,
-                "-l": "--length",
-                "--scalar": None,
-                "-s": "--scalar",
-                "--mamode": {c: {} for c in volatility_model.MAMODES},
-                "-m": "--mamode",
-                "--offset": zero_to_hundred,
-                "-o": "--offset",
-            }
-            choices["ad"]["--open"] = {}
-            choices["adosc"] = {
-                "--open": {},
-                "--fast": one_to_hundred,
-                "--slow": "--fast",
-            }
-            choices["fib"] = {
-                "--period": {str(c): {} for c in range(1, 960)},
-                "--start": None,
-                "--end": None,
-            }
-
-            choices["support"] = self.SUPPORT_CHOICES
-            choices["about"] = self.ABOUT_CHOICES
+            choices: dict = self.choices_default
 
             self.completer = NestedCompleter.from_nested_dict(choices)
 
@@ -273,9 +167,11 @@ class TechnicalAnalysisController(BaseController):
             "--offset",
             action="store",
             dest="n_offset",
-            type=int,
+            type=check_non_negative,
             default=0,
             help="offset",
+            choices=range(0, 100),
+            metavar="N_OFFSET",
         )
 
         if other_args and "-" not in other_args[0][0]:
@@ -292,6 +188,9 @@ class TechnicalAnalysisController(BaseController):
                 window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -325,9 +224,11 @@ class TechnicalAnalysisController(BaseController):
             "--offset",
             action="store",
             dest="n_offset",
-            type=int,
+            type=check_non_negative,
             default=0,
             help="offset",
+            choices=range(0, 100),
+            metavar="N_OFFSET",
         )
 
         if other_args and "-" not in other_args[0][0]:
@@ -344,6 +245,9 @@ class TechnicalAnalysisController(BaseController):
                 window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -374,9 +278,11 @@ class TechnicalAnalysisController(BaseController):
             "--offset",
             action="store",
             dest="n_offset",
-            type=int,
+            type=check_non_negative,
             default=0,
             help="offset",
+            choices=range(0, 100),
+            metavar="N_OFFSET",
         )
 
         if other_args and "-" not in other_args[0][0]:
@@ -393,6 +299,9 @@ class TechnicalAnalysisController(BaseController):
                 window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -423,9 +332,11 @@ class TechnicalAnalysisController(BaseController):
             "--offset",
             action="store",
             dest="n_offset",
-            type=int,
+            type=check_non_negative,
             default=0,
             help="offset",
+            choices=range(0, 100),
+            metavar="N_OFFSET",
         )
 
         if other_args and "-" not in other_args[0][0]:
@@ -442,6 +353,9 @@ class TechnicalAnalysisController(BaseController):
                 window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -475,9 +389,11 @@ class TechnicalAnalysisController(BaseController):
             "--offset",
             action="store",
             dest="n_offset",
-            type=int,
+            type=check_non_negative,
             default=0,
             help="offset",
+            choices=range(0, 100),
+            metavar="N_OFFSET",
         )
 
         if other_args and "-" not in other_args[0][0]:
@@ -494,6 +410,9 @@ class TechnicalAnalysisController(BaseController):
                 window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -513,9 +432,11 @@ class TechnicalAnalysisController(BaseController):
             "--offset",
             action="store",
             dest="n_offset",
-            type=int,
+            type=check_non_negative,
             default=0,
             help="offset",
+            choices=range(0, 100),
+            metavar="N_OFFSET",
         )
         parser.add_argument(
             "--start",
@@ -555,6 +476,9 @@ class TechnicalAnalysisController(BaseController):
                 offset=ns_parser.n_offset,
                 interval=interval_text,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -582,6 +506,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=14,
             help="length",
+            choices=range(1, 100),
+            metavar="N_LENGTH",
         )
         parser.add_argument(
             "-s",
@@ -603,6 +529,9 @@ class TechnicalAnalysisController(BaseController):
                 window=ns_parser.n_length,
                 scalar=ns_parser.n_scalar,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -631,6 +560,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=12,
             help="The short period.",
+            choices=range(1, 100),
+            metavar="N_FAST",
         )
         parser.add_argument(
             "--slow",
@@ -639,6 +570,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=26,
             help="The long period.",
+            choices=range(1, 100),
+            metavar="N_SLOW",
         )
         parser.add_argument(
             "--signal",
@@ -647,6 +580,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=9,
             help="The signal period.",
+            choices=range(1, 100),
+            metavar="N_SIGNAL",
         )
 
         ns_parser = self.parse_known_args_and_warn(
@@ -660,6 +595,9 @@ class TechnicalAnalysisController(BaseController):
                 n_slow=ns_parser.n_slow,
                 n_signal=ns_parser.n_signal,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -686,6 +624,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=14,
             help="length",
+            choices=range(1, 100),
+            metavar="N_LENGTH",
         )
         parser.add_argument(
             "-s",
@@ -704,6 +644,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=1,
             help="drift",
+            choices=range(1, 100),
+            metavar="N_DRIFT",
         )
 
         if other_args and "-" not in other_args[0][0]:
@@ -720,6 +662,9 @@ class TechnicalAnalysisController(BaseController):
                 scalar=ns_parser.n_scalar,
                 drift=ns_parser.n_drift,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -746,6 +691,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=14,
             help="The time period of the fastk moving average",
+            choices=range(1, 100),
+            metavar="N_FASTKPERIOD",
         )
         parser.add_argument(
             "-d",
@@ -755,6 +702,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=3,
             help="The time period of the slowd moving average",
+            choices=range(1, 100),
+            metavar="N_SLOWDPERIOD",
         )
         parser.add_argument(
             "--slowkperiod",
@@ -763,6 +712,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=3,
             help="The time period of the slowk moving average",
+            choices=range(1, 100),
+            metavar="N_SLOWKPERIOD",
         )
 
         ns_parser = self.parse_known_args_and_warn(
@@ -776,6 +727,9 @@ class TechnicalAnalysisController(BaseController):
                 slowdperiod=ns_parser.n_slowdperiod,
                 slowkperiod=ns_parser.n_slowkperiod,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -801,6 +755,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=14,
             help="length",
+            choices=range(1, 100),
+            metavar="N_LENGTH",
         )
 
         if other_args and "-" not in other_args[0][0]:
@@ -815,6 +771,9 @@ class TechnicalAnalysisController(BaseController):
                 data=self.data,
                 window=ns_parser.n_length,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -840,6 +799,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=14,
             help="length",
+            choices=range(1, 100),
+            metavar="N_LENGTH",
         )
 
         if other_args and "-" not in other_args[0][0]:
@@ -854,6 +815,9 @@ class TechnicalAnalysisController(BaseController):
                 data=self.data["Adj Close"],
                 window=ns_parser.n_length,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -877,6 +841,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=14,
             help="length",
+            choices=range(1, 100),
+            metavar="N_LENGTH",
         )
         parser.add_argument(
             "-s",
@@ -895,6 +861,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=1,
             help="drift",
+            choices=range(1, 100),
+            metavar="N_DRIFT",
         )
 
         if other_args and "-" not in other_args[0][0]:
@@ -911,6 +879,9 @@ class TechnicalAnalysisController(BaseController):
                 scalar=ns_parser.n_scalar,
                 drift=ns_parser.n_drift,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -942,6 +913,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=25,
             help="length",
+            choices=range(1, 100),
+            metavar="N_LENGTH",
         )
         parser.add_argument(
             "-s",
@@ -966,6 +939,9 @@ class TechnicalAnalysisController(BaseController):
                 window=ns_parser.n_length,
                 scalar=ns_parser.n_scalar,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -997,6 +973,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=15,
             help="length",
+            choices=range(1, 100),
+            metavar="N_LENGTH",
         )
         parser.add_argument(
             "-s",
@@ -1006,6 +984,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=2,
             help="std",
+            choices=np.arange(0.0, 10, 0.25).tolist(),
+            metavar="N_STD",
         )
         parser.add_argument(
             "-m",
@@ -1014,6 +994,7 @@ class TechnicalAnalysisController(BaseController):
             dest="s_mamode",
             default="sma",
             help="mamode",
+            choices=volatility_model.MAMODES,
         )
 
         if other_args and "-" not in other_args[0][0]:
@@ -1030,6 +1011,9 @@ class TechnicalAnalysisController(BaseController):
                 n_std=ns_parser.n_std,
                 mamode=ns_parser.s_mamode,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -1056,6 +1040,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=20,
             help="length",
+            choices=range(1, 100),
+            metavar="N_LENGTH_UPPER",
         )
         parser.add_argument(
             "-l",
@@ -1065,6 +1051,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=20,
             help="length",
+            choices=range(1, 100),
+            metavar="N_LENGTH_LOWER",
         )
 
         ns_parser = self.parse_known_args_and_warn(
@@ -1077,6 +1065,9 @@ class TechnicalAnalysisController(BaseController):
                 upper_length=ns_parser.n_length_upper,
                 lower_length=ns_parser.n_length_lower,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -1102,6 +1093,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=20,
             help="Window length",
+            choices=range(1, 100),
+            metavar="N_LENGTH",
         )
         parser.add_argument(
             "-s",
@@ -1126,9 +1119,11 @@ class TechnicalAnalysisController(BaseController):
             "--offset",
             action="store",
             dest="n_offset",
-            type=int,
+            type=check_non_negative,
             default=0,
             help="offset",
+            choices=range(0, 100),
+            metavar="N_OFFSET",
         )
 
         if other_args and "-" not in other_args[0][0]:
@@ -1146,6 +1141,9 @@ class TechnicalAnalysisController(BaseController):
                 mamode=ns_parser.s_mamode,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -1185,6 +1183,9 @@ class TechnicalAnalysisController(BaseController):
                 data=self.data,
                 use_open=ns_parser.b_use_open,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -1218,6 +1219,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=3,
             help="fast length",
+            choices=range(1, 100),
+            metavar="N_LENGTH_FAST",
         )
         parser.add_argument(
             "--slow",
@@ -1226,6 +1229,8 @@ class TechnicalAnalysisController(BaseController):
             type=check_positive,
             default=10,
             help="slow length",
+            choices=range(1, 100),
+            metavar="N_LENGTH_SLOW",
         )
 
         ns_parser = self.parse_known_args_and_warn(
@@ -1239,6 +1244,9 @@ class TechnicalAnalysisController(BaseController):
                 fast=ns_parser.n_length_fast,
                 slow=ns_parser.n_length_slow,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -1267,6 +1275,9 @@ class TechnicalAnalysisController(BaseController):
                 symbol=self.ticker,
                 data=self.data,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -1282,9 +1293,11 @@ class TechnicalAnalysisController(BaseController):
             "-p",
             "--period",
             dest="period",
-            type=int,
+            type=check_positive,
             help="Days to look back for retracement",
             default=120,
+            choices=range(1, 960),
+            metavar="PERIOD",
         )
         parser.add_argument(
             "--start",
@@ -1315,6 +1328,9 @@ class TechnicalAnalysisController(BaseController):
                 start_date=ns_parser.start,
                 end_date=ns_parser.end,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -1371,7 +1387,7 @@ class TechnicalAnalysisController(BaseController):
         )
 
         ns_parser = self.parse_known_args_and_warn(
-            parser, other_args, EXPORT_ONLY_FIGURES_ALLOWED
+            parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_demark(
@@ -1379,6 +1395,9 @@ class TechnicalAnalysisController(BaseController):
                 self.ticker.upper(),
                 min_to_show=ns_parser.min_to_show,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)

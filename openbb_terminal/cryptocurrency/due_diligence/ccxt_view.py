@@ -21,9 +21,10 @@ def display_order_book(
     symbol: str,
     to_symbol: str,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """Displays order book for a coin in a given exchange
+    """Plots order book for a coin in a given exchange
     [Source: https://docs.ccxt.com/en/latest/manual.html]
 
     Parameters
@@ -38,7 +39,7 @@ def display_order_book(
         Export dataframe data to csv,json,xlsx file
     """
     market_book = ccxt_model.get_orderbook(
-        exchange_id=exchange, symbol=symbol, to_symbol=to_symbol
+        exchange=exchange, symbol=symbol, to_symbol=to_symbol
     )
     bids = np.asarray(market_book["bids"], dtype=float)
     asks = np.asarray(market_book["asks"], dtype=float)
@@ -56,14 +57,20 @@ def display_order_book(
         os.path.dirname(os.path.abspath(__file__)),
         "ob",
         market_book,
+        sheet_name,
     )
 
 
 @log_start_end(log=logger)
 def display_trades(
-    exchange: str, symbol: str, to_symbol: str, limit: int = 10, export: str = ""
+    exchange: str,
+    symbol: str,
+    to_symbol: str,
+    limit: int = 10,
+    export: str = "",
+    sheet_name: str = None,
 ):
-    """Displays trades for a coin in a given exchange
+    """Prints table showing trades for a coin in a given exchange
     [Source: https://docs.ccxt.com/en/latest/manual.html]
 
     Parameters
@@ -92,4 +99,5 @@ def display_trades(
         os.path.dirname(os.path.abspath(__file__)),
         "trades",
         df,
+        sheet_name,
     )

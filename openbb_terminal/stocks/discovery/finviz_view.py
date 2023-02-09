@@ -2,27 +2,29 @@
 __docformat__ = "numpy"
 
 import os
+from typing import Optional
 import pandas as pd
 
 import plotly.express as px
 from plotly.subplots import make_subplots
 
 from openbb_terminal.stocks.discovery import finviz_model
-from openbb_terminal.rich_config import console
 from openbb_terminal.helper_funcs import export_data
 
 
-def display_heatmap(timeframe: str, export: str = ""):
+def display_heatmap(timeframe: str, export: str = "", sheet_name: Optional[str] = ""):
     """Display heatmap from finviz
 
     Parameters
     ----------
     timeframe: str
         Timeframe for performance
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     """
-    console.print("")
+
     dfs = finviz_model.get_heatmap_data(timeframe)
     if dfs.empty:
         return
@@ -31,6 +33,7 @@ def display_heatmap(timeframe: str, export: str = ""):
         os.path.dirname(os.path.abspath(__file__)),
         "heatmap",
         dfs,
+        sheet_name,
     )
     color_bin = [-100, -2, -1, -0.001, 0.001, 1, 2, 100]
     dfs["colors"] = pd.cut(

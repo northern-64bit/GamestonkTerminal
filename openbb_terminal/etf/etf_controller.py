@@ -28,7 +28,6 @@ from openbb_terminal.etf.technical_analysis import ta_controller
 from openbb_terminal.helper_funcs import (
     EXPORT_BOTH_RAW_DATA_AND_FIGURES,
     EXPORT_ONLY_RAW_DATA_ALLOWED,
-    check_non_negative_float,
     check_positive,
     export_data,
     valid_date,
@@ -37,7 +36,7 @@ from openbb_terminal.helper_funcs import (
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
-from openbb_terminal.rich_config import console, MenuText, get_ordered_list_sources
+from openbb_terminal.rich_config import console, MenuText
 from openbb_terminal.stocks import stocks_helper
 from openbb_terminal.stocks.comparison_analysis import ca_controller
 
@@ -82,6 +81,7 @@ class ETFController(BaseController):
 
     PATH = "/etf/"
     FILE_PATH = os.path.join(os.path.dirname(__file__), "README.md")
+    CHOICES_GENERATION = True
 
     def __init__(self, queue: List[str] = None):
         """Constructor"""
@@ -93,60 +93,7 @@ class ETFController(BaseController):
         self.TRY_RELOAD = True
 
         if session and obbff.USE_PROMPT_TOOLKIT:
-            choices: dict = {c: {} for c in self.controller_choices}
-
-            one_to_fifty: dict = {str(c): {} for c in range(1, 50)}
-            one_to_hundred: dict = {str(c): {} for c in range(1, 100)}
-            choices["search"] = {
-                "--name": None,
-                "-n": "--name",
-                "--description": None,
-                "-d": "--description",
-                "--source": {
-                    c: {} for c in get_ordered_list_sources(f"{self.PATH}search")
-                },
-                "--limit": one_to_fifty,
-                "-l": "--limit",
-            }
-            choices["load"] = {
-                "--ticker": None,
-                "-t": "--ticker",
-                "--start": None,
-                "-s": "--start",
-                "--end": None,
-                "-e": "--end",
-                "--limit": one_to_fifty,
-                "-l": "--limit",
-            }
-            choices["weights"] = {"--min": one_to_hundred, "-m": "--min", "--raw": {}}
-
-            choices["candle"] = {
-                "--sort": {c: {} for c in self.CANDLE_COLUMNS},
-                "-s": "--sort",
-                "--plotly": {},
-                "-p": "--plotly",
-                "--ma": None,
-                "--descending": {},
-                "-d": "--descending",
-                "--trend": {},
-                "-t": "--trend",
-                "--raw": {},
-                "--num": one_to_hundred,
-                "-n": "--num",
-            }
-            choices["pir"] = {
-                "--etfs": None,
-                "-e": "--etfs",
-                "--filename": None,
-                "--folder": None,
-            }
-            choices["compare"] = {
-                "--etfs": None,
-                "-e": "--etfs",
-            }
-
-            choices["support"] = self.SUPPORT_CHOICES
-            choices["about"] = self.ABOUT_CHOICES
+            choices: dict = self.choices_default
 
             self.completer = NestedCompleter.from_nested_dict(choices)
 
@@ -231,12 +178,18 @@ class ETFController(BaseController):
                         name=name_to_search,
                         limit=ns_parser.limit,
                         export=ns_parser.export,
+                        sheet_name=" ".join(ns_parser.sheet_name)
+                        if ns_parser.sheet_name
+                        else None,
                     )
                 elif ns_parser.source == "StockAnalysis":
                     stockanalysis_view.display_etf_by_name(
                         name=name_to_search,
                         limit=ns_parser.limit,
                         export=ns_parser.export,
+                        sheet_name=" ".join(ns_parser.sheet_name)
+                        if ns_parser.sheet_name
+                        else None,
                     )
                 else:
                     console.print("Wrong source choice!\n")
@@ -246,6 +199,9 @@ class ETFController(BaseController):
                     description=description_to_search,
                     limit=ns_parser.limit,
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
 
     @log_start_end(log=logger)
@@ -281,6 +237,7 @@ class ETFController(BaseController):
             dest="end",
             help="The ending date (format YYYY-MM-DD) of the ETF",
         )
+
         parser.add_argument(
             "-l",
             "--limit",
@@ -308,13 +265,19 @@ class ETFController(BaseController):
 
             self.etf_name = ns_parser.ticker.upper()
             self.etf_data = df_etf_candidate
-            quote_type = etf_helper.get_quote_type(self.etf_name)
-            if quote_type != "ETF":
-                console.print(f"{self.etf_name} is: {quote_type.lower()}")
             holdings = stockanalysis_model.get_etf_holdings(self.etf_name)
             if holdings.empty:
-                console.print("No company holdings found!\n")
+                quote_type = etf_helper.get_quote_type(self.etf_name)
+                if quote_type != "ETF":
+                    if quote_type == "N/A":
+                        console.print(
+                            "[red]Cannot determine ticker type.  Holdings only shown for ETFs\n[/red]"
+                        )
+                    else:
+                        console.print(f"{self.etf_name} is: {quote_type.lower()}")
+                    console.print("No company holdings found!")
             else:
+                self.etf_holdings.clear()
                 console.print("Top holdings found:")
                 for val in holdings["Name"].values[: ns_parser.limit].tolist():
                     console.print(f"   {val}")
@@ -353,7 +316,11 @@ class ETFController(BaseController):
 
         if ns_parser:
             stockanalysis_view.view_overview(
-                symbol=self.etf_name, export=ns_parser.export
+                symbol=self.etf_name,
+                export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -373,9 +340,6 @@ class ETFController(BaseController):
             help="Number of holdings to get",
             default=10,
         )
-        if not self.etf_name:
-            console.print("Please load a ticker using <load name>. \n")
-            return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
@@ -383,12 +347,18 @@ class ETFController(BaseController):
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
-            stockanalysis_view.view_holdings(
-                symbol=self.etf_name,
-                limit=ns_parser.limit,
-                export=ns_parser.export,
-            )
-            console.print()
+            if self.etf_name:
+                stockanalysis_view.view_holdings(
+                    symbol=self.etf_name,
+                    limit=ns_parser.limit,
+                    export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
+                )
+                console.print()
+            else:
+                console.print("Please load a ticker using <load name>. \n")
 
     @log_start_end(log=logger)
     def call_news(self, other_args: List[str]):
@@ -487,19 +457,16 @@ class ETFController(BaseController):
             help="Choose a column to sort by",
         )
         parser.add_argument(
-            "-d",
-            "--descending",
+            "-r",
+            "--reverse",
             action="store_true",
-            dest="descending",
+            dest="reverse",
             default=False,
-            help="Sort selected column descending",
-        )
-        parser.add_argument(
-            "--raw",
-            action="store_true",
-            dest="raw",
-            default=False,
-            help="Shows raw data instead of chart",
+            help=(
+                "Data is sorted in descending order by default. "
+                "Reverse flag will sort it in an ascending way. "
+                "Only works when raw data is displayed."
+            ),
         )
         parser.add_argument(
             "-n",
@@ -508,6 +475,8 @@ class ETFController(BaseController):
             help="Number to show if raw selected",
             dest="num",
             default=20,
+            choices=range(1, 100),
+            metavar="NUM",
         )
         parser.add_argument(
             "-t",
@@ -529,7 +498,10 @@ class ETFController(BaseController):
         )
 
         ns_parser = self.parse_known_args_and_warn(
-            parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
+            parser,
+            other_args,
+            EXPORT_BOTH_RAW_DATA_AND_FIGURES,
+            raw=True,
         )
         if ns_parser:
             if not self.etf_name:
@@ -539,7 +511,7 @@ class ETFController(BaseController):
                 qa_view.display_raw(
                     data=self.etf_data,
                     sortby=ns_parser.sort,
-                    ascend=not ns_parser.descending,
+                    ascend=ns_parser.reverse,
                     limit=ns_parser.num,
                 )
 
@@ -579,6 +551,7 @@ class ETFController(BaseController):
                 os.path.dirname(os.path.abspath(__file__)),
                 f"{self.etf_name}",
                 self.etf_data,
+                ns_parser.sheet_name,
             )
 
     @log_start_end(log=logger)
@@ -636,6 +609,10 @@ class ETFController(BaseController):
                         f"[red]Could not find the file: {ns_parser.filename}[/red]\n"
                     )
                     return
+                except Exception:
+                    console.print("[red]Failed to create report.[/red]\n")
+                    return
+
                 console.print(
                     f"Created ETF report as {ns_parser.filename} in folder {ns_parser.folder} \n"
                 )
@@ -652,22 +629,21 @@ class ETFController(BaseController):
         parser.add_argument(
             "-m",
             "--min",
-            type=check_non_negative_float,
+            type=check_positive,
             dest="min",
             help="Minimum positive float to display sector",
             default=5,
-        )
-        parser.add_argument(
-            "--raw",
-            action="store_true",
-            dest="raw",
-            help="Only output raw data",
+            choices=range(1, 100),
+            metavar="MIN",
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
         ns_parser = self.parse_known_args_and_warn(
-            parser, other_args, export_allowed=EXPORT_BOTH_RAW_DATA_AND_FIGURES
+            parser,
+            other_args,
+            export_allowed=EXPORT_BOTH_RAW_DATA_AND_FIGURES,
+            raw=True,
         )
         if ns_parser:
             yfinance_view.display_etf_weightings(
@@ -675,6 +651,9 @@ class ETFController(BaseController):
                 raw=ns_parser.raw,
                 min_pct_to_display=ns_parser.min,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -764,4 +743,10 @@ class ETFController(BaseController):
         )
         if ns_parser:
             etf_list = ns_parser.names.upper().split(",")
-            stockanalysis_view.view_comparisons(etf_list, export=ns_parser.export)
+            stockanalysis_view.view_comparisons(
+                etf_list,
+                export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
+            )

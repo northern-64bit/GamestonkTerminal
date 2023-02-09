@@ -6,7 +6,6 @@ from itertools import cycle
 import logging
 import os
 
-from datetime import datetime, timedelta
 from matplotlib import pyplot as plt
 
 from openbb_terminal.config_terminal import theme
@@ -31,6 +30,7 @@ def display_search(
     exchange: str = "",
     description: str = "",
     export: str = "",
+    sheet_name: str = None,
 ):
     """Display search futures [Source: Yahoo Finance]
 
@@ -42,6 +42,8 @@ def display_search(
         Select the exchange where the future exists
     description: str
         Select the description of the future
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Type of format to export data
     """
@@ -58,63 +60,71 @@ def display_search(
         os.path.dirname(os.path.abspath(__file__)),
         "search",
         df,
+        sheet_name,
     )
 
 
 @log_start_end(log=logger)
 def display_historical(
-    tickers: List[str],
+    symbols: List[str],
     expiry: str = "",
-    start_date: str = (datetime.now() - timedelta(days=3 * 365)).strftime("%Y-%m-%d"),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     raw: bool = False,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
     """Display historical futures [Source: Yahoo Finance]
 
     Parameters
     ----------
-    tickers: List[str]
-        List of future timeseries tickers to display
+    symbols: List[str]
+        List of future timeseries symbols to display
     expiry: str
         Future expiry date with format YYYY-MM
-    start_date : str
-        Initial date like string (e.g., 2021-10-01)
+    start_date: Optional[str]
+        Start date of the historical data with format YYYY-MM-DD
+    end_date: Optional[str]
+        End date of the historical data with format YYYY-MM-DD
     raw: bool
         Display futures timeseries in raw format
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Type of format to export data
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
-    tickers_validated = list()
-    for ticker in tickers:
-        if ticker in yfinance_model.FUTURES_DATA["Ticker"].unique().tolist():
-            tickers_validated.append(ticker)
+
+    symbols_validated = list()
+    for symbol in symbols:
+        if symbol in yfinance_model.FUTURES_DATA["Ticker"].unique().tolist():
+            symbols_validated.append(symbol)
         else:
-            console.print(f"[red]{ticker} is not a valid ticker[/red]")
+            console.print(f"[red]{symbol} is not a valid symbol[/red]")
 
-    tickers = tickers_validated
+    symbols = symbols_validated
 
-    if not tickers:
-        console.print("No ticker was provided.\n")
+    if not symbols:
+        console.print("No symbol was provided.\n")
         return
 
-    historicals = yfinance_model.get_historical_futures(tickers, expiry)
+    historicals = yfinance_model.get_historical_futures(
+        symbols, expiry, start_date, end_date
+    )
 
     if historicals.empty:
-        console.print(f"No data was found for the tickers: {', '.join(tickers)}\n")
         return
 
     if raw or len(historicals) == 1:
-
         if not raw and len(historicals) == 1:
             console.print(
                 "\nA single datapoint is not enough to depict a chart, data is presented below."
             )
 
         print_rich_table(
-            historicals[historicals.index > datetime.strptime(start_date, "%Y-%m-%d")],
+            historicals,
             headers=list(historicals.columns),
             show_index=True,
             title="Futures timeseries",
@@ -122,7 +132,6 @@ def display_historical(
         console.print()
 
     else:
-
         # This plot has 1 axis
         if not external_axes:
             _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
@@ -132,7 +141,7 @@ def display_historical(
             return
 
         colors = cycle(theme.get_colors())
-        if len(tickers) > 1:
+        if len(symbols) > 1:
             name = list()
             for tick in historicals["Adj Close"].columns.tolist():
                 if len(historicals["Adj Close"][tick].dropna()) == 1:
@@ -143,12 +152,7 @@ def display_historical(
                         yfinance_model.FUTURES_DATA["Ticker"] == tick
                     ]["Description"].values[0]
                     print_rich_table(
-                        historicals[
-                            historicals["Adj Close"][tick].index
-                            > datetime.strptime(start_date, "%Y-%m-%d")
-                        ]["Adj Close"][tick]
-                        .dropna()
-                        .to_frame(),
+                        historicals["Adj Close"][tick].dropna().to_frame(),
                         headers=[naming],
                         show_index=True,
                         title="Futures timeseries",
@@ -167,25 +171,19 @@ def display_historical(
                 )
                 ax.legend(name)
 
-                first = datetime.strptime(start_date, "%Y-%m-%d")
-                if historicals["Adj Close"].index[0] > first:
-                    first = historicals["Adj Close"].index[0]
-                ax.set_xlim(first, historicals["Adj Close"].index[-1])
                 theme.style_primary_axis(ax)
 
                 make_white(ax)
-                if external_axes is None:
-                    theme.visualize_output()
+
+            if external_axes is None:
+                theme.visualize_output()
         else:
             if len(historicals["Adj Close"]) == 1:
                 console.print(
-                    f"\nA single datapoint on {tickers[0]} is not enough to depict a chart, data shown below."
+                    f"\nA single datapoint on {symbols[0]} is not enough to depict a chart, data shown below."
                 )
                 print_rich_table(
-                    historicals[
-                        historicals["Adj Close"].index
-                        > datetime.strptime(start_date, "%Y-%m-%d")
-                    ],
+                    historicals,
                     headers=list(historicals["Adj Close"].columns),
                     show_index=True,
                     title="Futures timeseries",
@@ -193,7 +191,7 @@ def display_historical(
 
             else:
                 name = yfinance_model.FUTURES_DATA[
-                    yfinance_model.FUTURES_DATA["Ticker"] == tickers[0]
+                    yfinance_model.FUTURES_DATA["Ticker"] == symbols[0]
                 ]["Description"].values[0]
                 ax.plot(
                     historicals["Adj Close"].dropna().index,
@@ -205,10 +203,6 @@ def display_historical(
                 else:
                     ax.set_title(name)
 
-                first = datetime.strptime(start_date, "%Y-%m-%d")
-                if historicals["Adj Close"].index[0] > first:
-                    first = historicals["Adj Close"].index[0]
-                ax.set_xlim(first, historicals["Adj Close"].index[-1])
                 theme.style_primary_axis(ax)
 
                 make_white(ax)
@@ -219,35 +213,39 @@ def display_historical(
         export,
         os.path.dirname(os.path.abspath(__file__)),
         "historical",
-        historicals[historicals.index > datetime.strptime(start_date, "%Y-%m-%d")],
+        historicals,
+        sheet_name,
     )
 
 
 @log_start_end(log=logger)
 def display_curve(
-    ticker: str,
+    symbol: str,
     raw: bool = False,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
     """Display curve futures [Source: Yahoo Finance]
 
     Parameters
     ----------
-    ticker: str
-        Curve future ticker to display
+    symbol: str
+        Curve future symbol to display
     raw: bool
         Display futures timeseries in raw format
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Type of format to export data
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
-    if ticker not in yfinance_model.FUTURES_DATA["Ticker"].unique().tolist():
-        console.print(f"[red]'{ticker}' is not a valid ticker[/red]")
+    if symbol not in yfinance_model.FUTURES_DATA["Ticker"].unique().tolist():
+        console.print(f"[red]'{symbol}' is not a valid symbol[/red]")
         return
 
-    df = yfinance_model.get_curve_futures(ticker)
+    df = yfinance_model.get_curve_futures(symbol)
 
     if df.empty:
         console.print("[red]No future data found to generate curve.[/red]\n")
@@ -272,7 +270,7 @@ def display_curve(
             return
 
         name = yfinance_model.FUTURES_DATA[
-            yfinance_model.FUTURES_DATA["Ticker"] == ticker
+            yfinance_model.FUTURES_DATA["Ticker"] == symbol
         ]["Description"].values[0]
         colors = cycle(theme.get_colors())
         ax.plot(
@@ -296,4 +294,5 @@ def display_curve(
             os.path.dirname(os.path.abspath(__file__)),
             "curve",
             df,
+            sheet_name,
         )

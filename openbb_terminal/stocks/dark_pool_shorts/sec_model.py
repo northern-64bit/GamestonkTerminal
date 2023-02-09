@@ -3,13 +3,14 @@ __docformat__ = "numpy"
 
 import logging
 from datetime import datetime, timedelta
+from typing import Optional
+from urllib.error import HTTPError
 
 import pandas as pd
-import requests
 from bs4 import BeautifulSoup
 
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import get_user_agent
+from openbb_terminal.helper_funcs import get_user_agent, request
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ def catching_diff_url_formats(ftd_urls: list) -> list:
         list of urls of sec data
 
     Returns
-    ----------
+    -------
     list
         list of ftd urls
     """
@@ -58,8 +59,8 @@ def catching_diff_url_formats(ftd_urls: list) -> list:
 @log_start_end(log=logger)
 def get_fails_to_deliver(
     symbol: str,
-    start_date: str = (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d"),
-    end_date: str = datetime.now().strftime("%Y-%m-%d"),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     limit: int = 0,
 ) -> pd.DataFrame:
     """Display fails-to-deliver data for a given ticker. [Source: SEC]
@@ -68,18 +69,25 @@ def get_fails_to_deliver(
     ----------
     symbol : str
         Stock ticker
-    start_date : str
+    start_date : Optional[str]
         Start of data, in YYYY-MM-DD format
-    end_date : str
+    end_date : Optional[str]
         End of data, in YYYY-MM-DD format
     limit : int
         Number of latest fails-to-deliver being printed
 
     Returns
-    ----------
+    -------
     pd.DataFrame
         Fail to deliver data
     """
+
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d")
+
+    if end_date is None:
+        end_date = datetime.now().strftime("%Y-%m-%d")
+
     ftds_data = pd.DataFrame()
     start = datetime.strptime(start_date, "%Y-%m-%d")
     end = datetime.strptime(end_date, "%Y-%m-%d")
@@ -88,7 +96,7 @@ def get_fails_to_deliver(
     if limit > 0:
         url_ftds = "https://www.sec.gov/data/foiadocsfailsdatahtm"
         text_soup_ftds = BeautifulSoup(
-            requests.get(url_ftds, headers={"User-Agent": get_user_agent()}).text,
+            request(url_ftds, headers={"User-Agent": get_user_agent()}).text,
             "lxml",
         )
 
@@ -162,16 +170,20 @@ def get_fails_to_deliver(
         ftd_urls = catching_diff_url_formats(ftd_urls)
 
         for ftd_link in ftd_urls:
-            all_ftds = pd.read_csv(
-                ftd_link,
-                compression="zip",
-                sep="|",
-                engine="python",
-                skipfooter=2,
-                usecols=[0, 2, 3, 5],
-                dtype={"QUANTITY (FAILS)": "Int64"},
-                encoding="iso8859",
-            )
+            try:
+                all_ftds = pd.read_csv(
+                    ftd_link,
+                    compression="zip",
+                    sep="|",
+                    engine="python",
+                    skipfooter=2,
+                    usecols=[0, 2, 3, 5],
+                    dtype={"QUANTITY (FAILS)": "Int64"},
+                    encoding="iso8859",
+                )
+            except HTTPError:
+                continue
+
             tmp_ftds = all_ftds[all_ftds["SYMBOL"] == symbol]
             del tmp_ftds["PRICE"]
             del tmp_ftds["SYMBOL"]

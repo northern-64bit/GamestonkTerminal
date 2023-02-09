@@ -4,6 +4,7 @@ env:
   OPENBB_LOG_COLLECT: false
   OPENBB_USE_ION: false
   OPENBB_USE_PROMPT_TOOLKIT: false
+  OPENBB_FILE_OVERWRITE: true
   PIP_DEFAULT_TIMEOUT: 100
   PYTHONNOUSERSITE: 1
 on:
@@ -67,7 +68,7 @@ jobs:
         shell: bash -l {0}
         id: pip-cache
         run: |
-          echo "::set-output name=dir::$(pip cache dir)"
+          echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
 
       - name: pip cache
         uses: actions/cache@v2
@@ -87,6 +88,7 @@ jobs:
         run: |
           conda info
           pip install --requirement requirements-full.txt
+          pip install docstring_parser
 
       - name: List installed packages (Bash)
         shell: bash -l {0}

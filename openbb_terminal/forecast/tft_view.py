@@ -39,6 +39,7 @@ def display_tft_forecast(
     force_reset: bool = True,
     save_checkpoints: bool = True,
     export: str = "",
+    sheet_name: str = None,
     residuals: bool = False,
     forecast_only: bool = False,
     start_date: Optional[datetime] = None,
@@ -53,7 +54,7 @@ def display_tft_forecast(
     ----------
     data (Union[pd.Series, pd.DataFrame]):
         Input Data
-    target_column (str, optional):
+    target_column: Optional[str]:
         Target column to forecast. Defaults to "close".
     dataset_name str
         The name of the ticker to be predicted
@@ -162,6 +163,7 @@ def display_tft_forecast(
         precision=precision,
         probabilistic=probabilistic,
         export=export,
+        sheet_name=sheet_name,
         forecast_only=forecast_only,
         naive=naive,
         export_pred_raw=export_pred_raw,

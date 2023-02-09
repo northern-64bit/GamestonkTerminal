@@ -50,7 +50,6 @@ class PortfolioAnalysisController(BaseController):
     PATH = "/portfolio/pa/"
 
     def __init__(self, queue: List[str] = None):
-
         super().__init__(queue)
 
         self.portfolio_name = ""
@@ -214,4 +213,3 @@ class PortfolioAnalysisController(BaseController):
             console.print("\nAvailable Portfolios:\n")
             for port in available_ports:
                 console.print(port)
-            console.print("")

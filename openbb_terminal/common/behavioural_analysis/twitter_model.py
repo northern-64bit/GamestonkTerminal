@@ -6,12 +6,11 @@ import logging
 from typing import Optional
 
 import pandas as pd
-import requests
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 from openbb_terminal import config_terminal as cfg
 from openbb_terminal.decorators import check_api_key, log_start_end
-from openbb_terminal.helper_funcs import clean_tweet, get_data
+from openbb_terminal.helper_funcs import clean_tweet, get_data, request
 from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
@@ -27,7 +26,7 @@ def load_analyze_tweets(
     start_date: Optional[str] = "",
     end_date: Optional[str] = "",
 ) -> pd.DataFrame:
-    """Load tweets from twitter API and analyzes using VADER
+    """Load tweets from twitter API and analyzes using VADER.
 
     Parameters
     ----------
@@ -58,7 +57,7 @@ def load_analyze_tweets(
         params["end_time"] = end_date
 
     # Request Twitter API
-    response = requests.get(
+    response = request(
         "https://api.twitter.com/2/tweets/search/recent",
         params=params,  # type: ignore
         headers={"authorization": "Bearer " + cfg.API_TWITTER_BEARER_TOKEN},
@@ -127,7 +126,7 @@ def get_sentiment(
     n_tweets: int = 15,
     n_days_past: int = 2,
 ) -> pd.DataFrame:
-    """Get sentiments from symbol
+    """Get sentiments from symbol.
 
     Parameters
     ----------
@@ -137,6 +136,11 @@ def get_sentiment(
         Number of tweets to get per hour
     n_days_past: int
         Number of days to extract tweets for
+
+    Returns
+    -------
+    df_sentiment: pd.DataFrame
+        Dataframe of sentiment
     """
     # Date format string required by twitter
     dt_format = "%Y-%m-%dT%H:%M:%SZ"

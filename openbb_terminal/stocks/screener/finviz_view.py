@@ -131,6 +131,7 @@ def screener(
     ascend: bool = False,
     sortby: str = "",
     export: str = "",
+    sheet_name: str = None,
 ) -> List[str]:
     """Screener one of the following: overview, valuation, financial, ownership, performance, technical.
 
@@ -246,9 +247,12 @@ def screener(
             os.path.dirname(os.path.abspath(__file__)),
             data_type,
             df_screen,
+            sheet_name,
         )
 
         return list(df_screen.head(n=limit)["Ticker"].values)
 
-    console.print("")
+    console.print(
+        "The preset selected did not return a sufficient number of tickers. Two or more tickers are needed."
+    )
     return []

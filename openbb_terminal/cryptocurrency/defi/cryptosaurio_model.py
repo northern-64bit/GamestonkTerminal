@@ -2,10 +2,9 @@
 __docformat__ = "numpy"
 
 import logging
-from typing import Tuple, Any
+from typing import Tuple
 import pandas as pd
-import requests
-
+from openbb_terminal.helper_funcs import request
 from openbb_terminal.decorators import log_start_end
 
 logger = logging.getLogger(__name__)
@@ -14,7 +13,7 @@ api_url = "https://barney.cryptosaurio.com"
 
 
 @log_start_end(log=logger)
-def get_anchor_data(address: str = "") -> Tuple[Any, Any, str]:
+def get_anchor_data(address: str = "") -> Tuple[pd.DataFrame, pd.DataFrame, str]:
     """Returns anchor protocol earnings data of a certain terra address
     [Source: https://cryptosaurio.com/]
 
@@ -22,11 +21,12 @@ def get_anchor_data(address: str = "") -> Tuple[Any, Any, str]:
     ----------
     address : str
         Terra address. Valid terra addresses start with 'terra'
+
     Returns
     -------
-    Tuple:
-        - pandas.DataFrame: Earnings over time in UST
-        - pandas.DataFrame: History of transactions
+    Tuple[pd.DataFrame, pd.DataFrame, str]
+        - pd.DataFrame: Earnings over time in UST
+        - pd.DataFrame: History of transactions
         - str:              Overall statistics
     """
 
@@ -35,7 +35,7 @@ def get_anchor_data(address: str = "") -> Tuple[Any, Any, str]:
             "Select a valid address. Valid terra addresses start with 'terra'"
         )
 
-    response = requests.get(f"{api_url}/get-anchor-protocol-data-v2/{address}")
+    response = request(f"{api_url}/get-anchor-protocol-data-v2/{address}")
     if response.status_code != 200:
         raise Exception(f"Status code: {response.status_code}. Reason: {response.text}")
 

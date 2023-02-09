@@ -50,6 +50,7 @@ class FuturesController(BaseController):
     curve_type = "futures"
 
     PATH = "/futures/"
+    CHOICES_GENERATION = True
 
     def __init__(self, queue: List[str] = None):
         """Constructor"""
@@ -60,30 +61,11 @@ class FuturesController(BaseController):
         self.all_categories = yfinance_model.FUTURES_DATA["Category"].unique().tolist()
 
         if session and obbff.USE_PROMPT_TOOLKIT:
-            self.choices: dict = {c: {} for c in self.controller_choices}
+            self.choices: dict = self.choices_default
 
-            self.choices["search"] = {
-                "--category": {c: None for c in self.all_categories},
-                "-c": "--category",
-                "--exchange": {c: None for c in self.all_exchanges},
-                "-e": "--exchange",
-                "--description": {},
-                "-d": "--description",
-            }
-
-            self.choices["support"] = self.SUPPORT_CHOICES
-            self.choices["about"] = self.ABOUT_CHOICES
-
-            self.choices["historical"] = {c: None for c in self.all_tickers}
+            self.choices["historical"].update({c: None for c in self.all_tickers})
             self.choices["historical"]["--ticker"] = {c: None for c in self.all_tickers}
-            self.choices["historical"]["-t"] = "--ticker"
-            self.choices["historical"]["--start"] = {}
-            self.choices["historical"]["-s"] = "--start"
-            self.choices["historical"]["--expiry"] = {}
-            self.choices["historical"]["-e"] = "--expiry"
-            self.choices["curve"] = {c: None for c in self.all_tickers}
-            self.choices["curve"]["--ticker"] = {c: None for c in self.all_tickers}
-            self.choices["curve"]["-t"] = "--ticker"
+            self.choices["curve"].update({c: None for c in self.all_tickers})
 
             self.completer = NestedCompleter.from_nested_dict(self.choices)  # type: ignore
 
@@ -157,6 +139,9 @@ class FuturesController(BaseController):
                 exchange=ns_parser.exchange,
                 description=" ".join(ns_parser.description),
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -187,6 +172,13 @@ class FuturesController(BaseController):
         )
         parser.add_argument(
             "-e",
+            "--end",
+            dest="end",
+            type=valid_date,
+            help="Final date. Default: today",
+            default=datetime.now(),
+        )
+        parser.add_argument(
             "--expiry",
             dest="expiry",
             type=valid_expiry_date,
@@ -204,11 +196,15 @@ class FuturesController(BaseController):
         )
         if ns_parser:
             yfinance_view.display_historical(
-                tickers=ns_parser.ticker.upper().split(","),
+                symbols=ns_parser.ticker.upper().split(","),
                 expiry=ns_parser.expiry,
                 start_date=ns_parser.start.strftime("%Y-%m-%d"),
+                end_date=ns_parser.end.strftime("%Y-%m-%d"),
                 raw=ns_parser.raw,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -224,11 +220,12 @@ class FuturesController(BaseController):
             "-t",
             "--ticker",
             dest="ticker",
-            type=str,
+            type=lambda x: str(x).upper(),
             default="",
             help="Future curve to be selected",
-            metavar="Futures symbol",
             required="-h" not in other_args,
+            metavar="TICKER",
+            choices=self.all_tickers,
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-t")
@@ -241,7 +238,10 @@ class FuturesController(BaseController):
 
         if ns_parser:
             yfinance_view.display_curve(
-                ticker=ns_parser.ticker.upper(),
+                symbol=ns_parser.ticker.upper(),
                 raw=ns_parser.raw,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )

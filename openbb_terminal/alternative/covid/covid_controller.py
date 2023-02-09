@@ -31,6 +31,7 @@ class CovidController(BaseController):
 
     CHOICES_COMMANDS = ["country", "ov", "deaths", "cases", "rates", "slopes"]
     PATH = "/alternative/covid/"
+    CHOICES_GENERATION = True
 
     def __init__(self, queue: List[str] = None):
         """Constructor"""
@@ -42,31 +43,8 @@ class CovidController(BaseController):
         self.COUNTRY_LIST = [x.lower().replace(" ", "_") for x in countries_list]
 
         if session and obbff.USE_PROMPT_TOOLKIT:
-            choices: dict = {c: {} for c in self.controller_choices}
-            choices["country"] = {
-                "--country": {c: None for c in self.COUNTRY_LIST},
-                "-c": "--country",
-            }
-            choices["ov"] = {
-                "--raw": {},
-                "--limit": {str(c): {} for c in range(1, 1000)},
-                "-l": "--limit",
-            }
-            choices["rates"] = {
-                "--raw": {},
-                "--limit": {str(c): {} for c in range(1, 1000)},
-                "-l": "--limit",
-            }
-            choices["cases"] = {
-                "--raw": {},
-                "--limit": {str(c): {} for c in range(1, 1000)},
-                "-l": "--limit",
-            }
-            choices["deaths"] = {
-                "--raw": {},
-                "--limit": {str(c): {} for c in range(1, 1000)},
-                "-l": "--limit",
-            }
+            choices: dict = self.choices_default
+
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def print_help(self):
@@ -117,6 +95,8 @@ class CovidController(BaseController):
                     )
                     return
                 country = ns_parser.country.title().replace("_", " ")
+                if country == "Us":
+                    country = "US"
                 self.country = country
                 console.print(f"[cyan]{country}[/cyan] loaded\n")
             else:
@@ -145,6 +125,9 @@ class CovidController(BaseController):
                 raw=ns_parser.raw,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -170,6 +153,9 @@ class CovidController(BaseController):
                 raw=ns_parser.raw,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -195,6 +181,9 @@ class CovidController(BaseController):
                 raw=ns_parser.raw,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -220,6 +209,9 @@ class CovidController(BaseController):
                 raw=ns_parser.raw,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -240,11 +232,16 @@ class CovidController(BaseController):
             default=30,
         )
         parser.add_argument(
-            "-a",
-            "--ascend",
+            "-r",
+            "--reverse",
             action="store_true",
+            dest="reverse",
             default=False,
-            help="Show in ascending order",
+            help=(
+                "Data is sorted in descending order by default. "
+                "Reverse flag will sort it in an ascending way. "
+                "Only works when raw data is displayed."
+            ),
         )
         parser.add_argument(
             "-t",
@@ -264,6 +261,10 @@ class CovidController(BaseController):
             covid_view.display_case_slopes(
                 days_back=ns_parser.days,
                 limit=ns_parser.limit,
-                ascend=ns_parser.ascend,
+                ascend=ns_parser.reverse,
                 threshold=ns_parser.threshold,
+                export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )

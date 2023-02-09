@@ -4,18 +4,18 @@ __docformat__ = "numpy"
 # pylint: disable=no-member
 
 import logging
-from typing import Dict, Any, Tuple, Union
+from typing import Dict, Any, Optional, Tuple, Union
 from urllib.error import HTTPError
 from datetime import datetime
 
 import pandas as pd
 import pandas_datareader.data as web
-import requests
 import yfinance as yf
 
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.rich_config import console
 from openbb_terminal.helpers_denomination import transform as transform_by_denomination
+from openbb_terminal.helper_funcs import request
 
 logger = logging.getLogger(__name__)
 
@@ -483,10 +483,10 @@ def get_macro_data(
     parameter: str,
     country: str,
     transform: str = "",
-    start_date=pd.to_datetime("1900-01-01"),
-    end_date=datetime.today().date(),
+    start_date: str = "1900-01-01",
+    end_date: Optional[str] = None,
     symbol: str = "",
-) -> Tuple[Any, Union[str, Any]]:
+) -> Tuple[pd.Series, Union[str, Any]]:
     """Query the EconDB database to find specific macro data about a company [Source: EconDB]
 
     Parameters
@@ -494,7 +494,7 @@ def get_macro_data(
     parameter: str
         The type of data you wish to display
     country : str
-       the selected country
+        the selected country
     transform : str
         select data transformation from:
             '' - no transformation
@@ -505,18 +505,22 @@ def get_macro_data(
             'TNOR' - Start = 100
     start_date : str
         The starting date, format "YEAR-MONTH-DAY", i.e. 2010-12-31.
-    end_date : str
+    end_date : Optional[str]
         The end date, format "YEAR-MONTH-DAY", i.e. 2020-06-05.
     symbol : str
         In what currency you wish to convert all values.
 
     Returns
-    ----------
-    pd.Series
-        A series with the requested macro data of the chosen country
-    units
+    -------
+    Tuple[pd.Series, Union[str, Any]]
+        A series with the requested macro data of the chosen country,
         The units of the macro data, e.g. 'Bbl/day" for oil.
     """
+
+    if end_date is None:
+        end_date = datetime.today().strftime("%Y-%m-%d")
+
+    df, units = pd.DataFrame(), ""
     country = country.replace("_", " ")
     country = country.title()
     country = country.replace(" ", "_")
@@ -540,7 +544,7 @@ def get_macro_data(
         if transform:
             code += f"~{transform}"
 
-        r = requests.get(f"https://www.econdb.com/series/context/?tickers={code}")
+        r = request(f"https://www.econdb.com/series/context/?tickers={code}")
         res_json = r.json()
         if res_json:
             data = res_json[0]
@@ -565,7 +569,9 @@ def get_macro_data(
 
         if start_date or end_date:
             try:
-                df = df.loc[start_date:end_date]
+                dt_start = pd.to_datetime(start_date)
+                dt_end = pd.to_datetime(end_date)
+                df = df.loc[dt_start:dt_end]
             except TypeError:
                 console.print("[red]Invalid date sent. Format as YYYY-MM-DD[/red]\n")
                 return pd.DataFrame(), "NA/NA"
@@ -601,6 +607,10 @@ def get_macro_data(
                     f"NEW: {df_new_oldest} - {df_new_newest}"
                 )
 
+        if not df.empty:
+            df = df.groupby(df.index.strftime("%Y-%m")).head(1)
+            df.index = df.index.strftime("%Y-%m")
+
     except HTTPError:
         return console.print(
             f"There is no data available for the combination {parameter} and {country}."
@@ -614,8 +624,8 @@ def get_macro_transform() -> Dict[str, str]:
     """This function returns the available macro transform with detail.
 
     Returns
-    ----------
-    Dict[str]
+    -------
+    Dict[str, str]
         A dictionary with the available macro transforms.
     """
     return TRANSFORM
@@ -626,7 +636,7 @@ def get_macro_parameters() -> Dict[str, Dict[str, str]]:
     """This function returns the available macro parameters with detail.
 
     Returns
-    ----------
+    -------
     Dict[str, Dict[str, str]]
         A dictionary with the available macro parameters.
     """
@@ -638,7 +648,7 @@ def get_macro_countries() -> Dict[str, str]:
     """This function returns the available countries and respective currencies.
 
     Returns
-    ----------
+    -------
     Dict[str, str]
         A dictionary with the available countries and respective currencies.
     """
@@ -651,9 +661,9 @@ def get_aggregated_macro_data(
     countries: list = None,
     transform: str = "",
     start_date: str = "1900-01-01",
-    end_date=datetime.today().date(),
+    end_date: Optional[str] = None,
     symbol: str = "",
-) -> Tuple[Any, Dict[Any, Dict[Any, Any]], str]:
+) -> Tuple[pd.DataFrame, Dict[Any, Dict[Any, Any]], str]:
     """This functions groups the data queried from the EconDB database [Source: EconDB]
 
     Parameters
@@ -666,20 +676,26 @@ def get_aggregated_macro_data(
         The selected transform. Available transforms can be accessed through get_macro_transform().
     start_date : str
         The starting date, format "YEAR-MONTH-DAY", i.e. 2010-12-31.
-    end_date : str
+    end_date : Optional[str]
         The end date, format "YEAR-MONTH-DAY", i.e. 2020-06-05.
     symbol : str
         In what currency you wish to convert all values.
 
     Returns
-    ----------
-    pd.DataFrame
-        A DataFrame with the requested macro data of all chosen countries
-    Dictionary
-        A dictionary containing the units of each country's parameter (e.g. EUR)
-    str
-        Denomination which can be Trillions, Billions, Millions, Thousands
+    -------
+    Tuple[pd.DataFrame, Dict[Any, Dict[Any, Any]], str]
+        A DataFrame with the requested macro data of all chosen countries,
+        A dictionary containing the units of each country's parameter (e.g. EUR),
+        A string denomination which can be Trillions, Billions, Millions, Thousands
+
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> macro_df = openbb.economy.macro()
     """
+
+    if end_date is None:
+        end_date = datetime.today().strftime("%Y-%m-%d")
 
     if parameters is None:
         parameters = ["CPI"]
@@ -712,6 +728,7 @@ def get_aggregated_macro_data(
     ).T
 
     (df_rounded, denomination) = transform_by_denomination(country_data_df)
+    df_rounded.index = pd.DatetimeIndex(df_rounded.index)
 
     return (
         df_rounded,
@@ -726,7 +743,7 @@ def get_treasuries(
     maturities: list = None,
     frequency: str = "monthly",
     start_date: str = "1900-01-01",
-    end_date: str = str(datetime.today().date()),
+    end_date: Optional[str] = None,
 ) -> pd.DataFrame:
     """Get U.S. Treasury rates [Source: EconDB]
 
@@ -741,14 +758,22 @@ def get_treasuries(
         Frequency of the data, this can be annually, monthly, weekly or daily.
     start_date : str
         Starting date, format "YEAR-MONTH-DAY", i.e. 2010-12-31.
-    end_date : str
+    end_date : Optional[str]
         End date, format "YEAR-MONTH-DAY", i.e. 2020-06-05.
 
     Returns
-    ----------
+    -------
     treasury_data: pd.Dataframe
         Holds data of the selected types and maturities
+
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> openbb.economy.treasury()
     """
+
+    if end_date is None:
+        end_date = datetime.today().strftime("%Y-%m-%d")
 
     if instruments is None:
         instruments = ["nominal"]
@@ -830,7 +855,7 @@ def get_treasury_maturities() -> pd.DataFrame:
     """Get treasury maturity options [Source: EconDB]
 
     Returns
-    ----------
+    -------
     df: pd.DataFrame
         Contains the name of the instruments and a string containing all options.
     """

@@ -10,15 +10,15 @@ import pandas_ta as ta
 import yfinance as yf
 
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import is_intraday
 from openbb_terminal.common.technical_analysis import ta_helpers
+from openbb_terminal.helper_funcs import is_intraday
 
 logger = logging.getLogger(__name__)
 
 
 @log_start_end(log=logger)
 def get_data(symbol: str, start_date: str = "2019-01-01") -> pd.DataFrame:
-    """Function to replace bt.get, gets Adjusted close of symbol using yfinance
+    """Function to replace bt.get, gets Adjusted close of symbol using yfinance.
 
     Parameters
     ----------
@@ -32,18 +32,19 @@ def get_data(symbol: str, start_date: str = "2019-01-01") -> pd.DataFrame:
     prices: pd.DataFrame
         Dataframe of Adj Close with columns = [ticker]
     """
-    data = yf.download(symbol, start=start_date, progress=False)
+    data = yf.download(symbol, start=start_date, progress=False, ignore_tz=True)
     close_col = ta_helpers.check_columns(data, high=False, low=False)
     if close_col is None:
         return pd.DataFrame()
-    prices = pd.DataFrame(data[close_col])
-    prices.columns = [symbol]
-    return prices
+    df = pd.DataFrame(data[close_col])
+    df.columns = [symbol]
+
+    return df
 
 
 @log_start_end(log=logger)
 def buy_and_hold(symbol: str, start_date: str, name: str = "") -> bt.Backtest:
-    """Generates a buy and hold backtest object for the given ticker
+    """Generates a buy and hold backtest object for the given ticker.
 
     Parameters
     ----------
@@ -80,7 +81,7 @@ def ema_strategy(
     spy_bt: bool = True,
     no_bench: bool = False,
 ) -> bt.backtest.Result:
-    """Perform backtest for simple EMA strategy.  Buys when price>EMA(l)
+    """Perform backtest for simple EMA strategy.  Buys when price>EMA(l).
 
     Parameters
     ----------
@@ -147,7 +148,7 @@ def emacross_strategy(
     no_bench: bool = False,
     shortable: bool = True,
 ) -> bt.backtest.Result:
-    """Perform backtest for simple EMA strategy. Buys when price>EMA(l)
+    """Perform backtest for simple EMA strategy. Buys when price>EMA(l).
 
     Parameters
     ----------
@@ -224,7 +225,7 @@ def rsi_strategy(
     no_bench: bool = False,
     shortable: bool = True,
 ) -> bt.backtest.Result:
-    """Perform backtest for simple EMA strategy. Buys when price>EMA(l)
+    """Perform backtest for simple EMA strategy. Buys when price>EMA(l).
 
     Parameters
     ----------

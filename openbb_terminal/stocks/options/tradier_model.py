@@ -6,10 +6,12 @@ from typing import List, Optional
 
 import pandas as pd
 import requests
+from tqdm import tqdm
 
 from openbb_terminal import config_terminal as cfg
-from openbb_terminal.decorators import log_start_end, check_api_key
+from openbb_terminal.decorators import check_api_key, log_start_end
 from openbb_terminal.rich_config import console
+from openbb_terminal.helper_funcs import request
 
 logger = logging.getLogger(__name__)
 
@@ -73,21 +75,20 @@ def get_historical_options(
     """
     if not chain_id:
         op_type = ["call", "put"][put]
-        chain = get_option_chains(symbol, expiry)
+        chain = get_option_chain(symbol, expiry)
+        chain = chain[chain["option_type"] == op_type]
 
         try:
-            symbol = chain[(chain.strike == strike) & (chain.option_type == op_type)][
-                "symbol"
-            ].values[0]
+            symbol = chain[(chain.strike == strike)]["symbol"].values[0]
         except IndexError:
-            error = f"Strike: {strike}, Option type: {op_type} not not found"
+            error = f"Strike: {strike}, Option type: {op_type} not found"
             logging.exception(error)
             console.print(f"{error}\n")
             return pd.DataFrame()
     else:
         symbol = chain_id
 
-    response = requests.get(
+    response = request(
         "https://sandbox.tradier.com/v1/markets/history",
         params={"symbol": {symbol}, "interval": "daily"},
         headers={
@@ -113,6 +114,43 @@ def get_historical_options(
 
 # pylint: disable=no-else-return
 
+option_cols = [
+    "strike",
+    "bid",
+    "ask",
+    "volume",
+    "open_interest",
+    "mid_iv",
+]
+
+option_col_map = {"open_interest": "openinterest", "mid_iv": "iv"}
+
+
+@log_start_end(log=logger)
+@check_api_key(["API_TRADIER_TOKEN"])
+def get_full_option_chain(symbol: str) -> pd.DataFrame:
+    """Get available expiration dates for given ticker
+
+    Parameters
+    ----------
+    symbol: str
+        Ticker symbol to get expirations for
+
+    Returns
+    -------
+    pd.DataFrame
+       Dataframe of all option chains
+    """
+
+    expirations = option_expirations(symbol)
+    options_dfs: pd.DataFrame = []
+
+    for expiry in tqdm(expirations, desc="Getting option chains"):
+        chain = get_option_chain(symbol, expiry)
+        options_dfs.append(chain)
+
+    return pd.concat(options_dfs)
+
 
 @log_start_end(log=logger)
 @check_api_key(["API_TRADIER_TOKEN"])
@@ -129,7 +167,7 @@ def option_expirations(symbol: str) -> List[str]:
     dates: List[str]
         List of of available expirations
     """
-    r = requests.get(
+    r = request(
         "https://sandbox.tradier.com/v1/markets/options/expirations",
         params={"symbol": symbol, "includeAllRoots": "true", "strikes": "false"},
         headers={
@@ -152,7 +190,7 @@ def option_expirations(symbol: str) -> List[str]:
 
 @log_start_end(log=logger)
 @check_api_key(["API_TRADIER_TOKEN"])
-def get_option_chains(symbol: str, expiry: str) -> pd.DataFrame:
+def get_option_chain(symbol: str, expiry: str) -> pd.DataFrame:
     """Display option chains [Source: Tradier]"
 
     Parameters
@@ -174,7 +212,7 @@ def get_option_chains(symbol: str, expiry: str) -> pd.DataFrame:
         "Accept": "application/json",
     }
 
-    response = requests.get(
+    response = request(
         "https://sandbox.tradier.com/v1/markets/options/chains",
         params=params,
         headers=headers,
@@ -184,12 +222,13 @@ def get_option_chains(symbol: str, expiry: str) -> pd.DataFrame:
         return pd.DataFrame()
 
     chains = process_chains(response)
+    chains["expiration"] = expiry
     return chains
 
 
 @log_start_end(log=logger)
 def process_chains(response: requests.models.Response) -> pd.DataFrame:
-    """Function to take in the requests.get and return a DataFrame
+    """Function to take in the request and return a DataFrame
 
     Parameters
     ----------
@@ -226,7 +265,7 @@ def process_chains(response: requests.models.Response) -> pd.DataFrame:
 
 @log_start_end(log=logger)
 @check_api_key(["API_TRADIER_TOKEN"])
-def last_price(symbol: str):
+def get_last_price(symbol: str):
     """Makes api request for last price
 
     Parameters
@@ -239,7 +278,7 @@ def last_price(symbol: str):
     float:
         Last price
     """
-    r = requests.get(
+    r = request(
         "https://sandbox.tradier.com/v1/markets/quotes",
         params={"symbols": symbol, "includeAllRoots": "true", "strikes": "false"},
         headers={

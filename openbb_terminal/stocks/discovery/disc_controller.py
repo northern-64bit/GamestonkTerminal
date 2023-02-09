@@ -20,7 +20,6 @@ from openbb_terminal.helper_funcs import (
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
-from openbb_terminal.rich_config import console, MenuText, get_ordered_list_sources
 from openbb_terminal.stocks.discovery import (
     ark_view,
     finnhub_view,
@@ -30,6 +29,8 @@ from openbb_terminal.stocks.discovery import (
     yahoofinance_view,
     finviz_view,
 )
+from openbb_terminal.stocks import stocks_helper
+from openbb_terminal.rich_config import console, MenuText
 
 # pylint:disable=C0302
 
@@ -111,98 +112,14 @@ class DiscoveryController(BaseController):
         "Announcement Date",
     ]
     heatmap_timeframes = ["day", "week", "month", "3month", "6month", "year", "ytd"]
+    CHOICES_GENERATION = True
 
     def __init__(self, queue: List[str] = None):
         """Constructor"""
         super().__init__(queue)
 
         if session and obbff.USE_PROMPT_TOOLKIT:
-            choices: dict = {c: {} for c in self.controller_choices}
-
-            one_to_hundred: dict = {str(c): {} for c in range(1, 100)}
-            choices["pipo"] = {
-                "--days": one_to_hundred,
-                "-d": "--days",
-                "--start": None,
-                "-s": "--start",
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            choices["fipo"] = {
-                "--days": one_to_hundred,
-                "-d": "--days",
-                "--end": None,
-                "-e": "--end",
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            limit = {
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            choices["gainers"] = limit
-            choices["losers"] = limit
-            choices["ugs"] = limit
-            choices["gtech"] = limit
-            choices["active"] = limit
-            choices["ulc"] = limit
-            choices["asc"] = limit
-            choices["arkord"] = {
-                "--sortby": {c: {} for c in self.arkord_sortby_choices},
-                "-s": "--sortby",
-                "--ascend": {},
-                "-a": "--ascend",
-                "--buy_only": {},
-                "-b": "--buy_only",
-                "--sell_only": {},
-                "-c": "--sell_only",
-                "--fund": {c: {} for c in self.arkord_fund_choices},
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            choices["upcoming"] = {
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-                "--pages": one_to_hundred,
-                "-p": "--pages",
-            }
-            choices["trending"] = {
-                "--id": None,
-                "-i": "--id",
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-                "--date": None,
-                "-d": "--date",
-            }
-            choices["cnews"] = {
-                "--type": {c: {} for c in self.cnews_type_choices},
-                "-t": "--type",
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            choices["lowfloat"] = limit
-            choices["hotpenny"] = {
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-                "--source": {
-                    c: {} for c in get_ordered_list_sources(f"{self.PATH}hotpenny")
-                },
-            }
-            choices["rtat"] = limit
-            choices["divcal"] = {
-                "--date": None,
-                "-d": "--date",
-                "--sort": {c: {} for c in self.dividend_columns},
-                "-s": "--sort",
-                "--ascend": {},
-                "-a": "--ascend",
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            choices["heatmap"]["--timeframe"] = {
-                c: None for c in self.heatmap_timeframes
-            }
-            choices["heatmap"]["-t"] = "--timeframe"
+            choices: dict = self.choices_default
 
             self.completer = NestedCompleter.from_nested_dict(choices)
 
@@ -250,19 +167,23 @@ class DiscoveryController(BaseController):
         parser.add_argument(
             "-s",
             "--sort",
-            default=["Dividend"],
-            nargs="+",
-            type=str,
+            default="dividend",
+            type=str.lower,
+            choices=stocks_helper.format_parse_choices(self.dividend_columns),
             help="Column to sort by",
             dest="sort",
         )
         parser.add_argument(
-            "-a",
-            "--ascend",
-            default=False,
+            "-r",
+            "--reverse",
             action="store_true",
-            help="Flag to sort in ascending order",
-            dest="ascend",
+            dest="reverse",
+            default=False,
+            help=(
+                "Data is sorted in descending order by default. "
+                "Reverse flag will sort it in an ascending way. "
+                "Only works when raw data is displayed."
+            ),
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-d")
@@ -270,16 +191,20 @@ class DiscoveryController(BaseController):
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED, limit=10
         )
         if ns_parser:
-            sort_col = " ".join(ns_parser.sort)
-            if sort_col not in self.dividend_columns:
-                console.print(f"{sort_col} not a valid selection for sorting.\n")
-                return
+            # Map fixes
+
+            sort_col = stocks_helper.map_parse_choices(self.dividend_columns)[
+                ns_parser.sort
+            ]
             nasdaq_view.display_dividend_calendar(
                 date=ns_parser.date.strftime("%Y-%m-%d"),
                 sortby=sort_col,
-                ascend=ns_parser.ascend,
+                ascend=ns_parser.reverse,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -334,6 +259,9 @@ class DiscoveryController(BaseController):
                 limit=ns_parser.limit,
                 start_date=ns_parser.start,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -390,6 +318,9 @@ class DiscoveryController(BaseController):
                 limit=ns_parser.limit,
                 end_date=ns_parser.end,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -419,6 +350,9 @@ class DiscoveryController(BaseController):
             yahoofinance_view.display_gainers(
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -448,6 +382,9 @@ class DiscoveryController(BaseController):
             yahoofinance_view.display_losers(
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -480,6 +417,9 @@ class DiscoveryController(BaseController):
             yahoofinance_view.display_ugs(
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -510,6 +450,9 @@ class DiscoveryController(BaseController):
             yahoofinance_view.display_gtech(
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -541,6 +484,9 @@ class DiscoveryController(BaseController):
             yahoofinance_view.display_active(
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -572,6 +518,9 @@ class DiscoveryController(BaseController):
             yahoofinance_view.display_ulc(
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -603,6 +552,9 @@ class DiscoveryController(BaseController):
             yahoofinance_view.display_asc(
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -635,12 +587,16 @@ class DiscoveryController(BaseController):
             default="",
         )
         parser.add_argument(
-            "-a",
-            "--ascend",
-            dest="ascend",
-            help="Flag to sort in ascending order",
+            "-r",
+            "--reverse",
             action="store_true",
+            dest="reverse",
             default=False,
+            help=(
+                "Data is sorted in descending order by default. "
+                "Reverse flag will sort it in an ascending way. "
+                "Only works when raw data is displayed."
+            ),
         )
         parser.add_argument(
             "-b",
@@ -675,11 +631,14 @@ class DiscoveryController(BaseController):
             ark_view.ark_orders_view(
                 limit=ns_parser.limit,
                 sortby=ns_parser.sort_col,
-                ascend=ns_parser.ascend,
+                ascend=ns_parser.reverse,
                 buys_only=ns_parser.buys_only,
                 sells_only=ns_parser.sells_only,
                 fund=ns_parser.fund,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -720,6 +679,9 @@ class DiscoveryController(BaseController):
                 num_pages=ns_parser.n_pages,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -768,6 +730,9 @@ class DiscoveryController(BaseController):
                 article_id=ns_parser.n_id,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -803,6 +768,9 @@ class DiscoveryController(BaseController):
             shortinterest_view.low_float(
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -843,6 +811,9 @@ class DiscoveryController(BaseController):
                 news_type=ns_parser.s_type,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -873,6 +844,9 @@ class DiscoveryController(BaseController):
             shortinterest_view.hot_penny_stocks(
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
                 source=ns_parser.source,
             )
 
@@ -931,4 +905,10 @@ class DiscoveryController(BaseController):
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
-            finviz_view.display_heatmap(ns_parser.timeframe, ns_parser.export)
+            finviz_view.display_heatmap(
+                ns_parser.timeframe,
+                ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
+            )

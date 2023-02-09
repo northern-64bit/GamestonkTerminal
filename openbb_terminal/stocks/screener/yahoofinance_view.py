@@ -34,6 +34,7 @@ def historical(
     type_candle: str = "a",
     normalize: bool = True,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> List[str]:
     """View historical price of stocks that meet preset
@@ -63,6 +64,9 @@ def historical(
     df_screener, l_stocks, limit_random_stocks = yahoofinance_model.historical(
         preset_loaded, limit, start_date, type_candle, normalize
     )
+
+    if df_screener.empty:
+        return []
 
     if l_stocks:
         # This plot has 1 axis
@@ -99,6 +103,7 @@ def historical(
             os.path.dirname(os.path.abspath(__file__)),
             "historical",
             df_screener,
+            sheet_name,
         )
 
         return l_stocks

@@ -17,7 +17,6 @@
 [![Bugs Closed][bugs-closed-shield]][bugs-closed-url]
 
 [![Build Status](https://github.com/OpenBB-finance/OpenBBTerminal/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/OpenBB-finance/OpenBBTerminal/actions)
-[![Documentation Status](https://readthedocs.org/projects/gamestonk-terminal/badge/?version=latest)](https://gamestonk-terminal.readthedocs.io/?badge=latest)
 [![GitHub release](https://img.shields.io/github/release/OpenBB-finance/OpenBBTerminal.svg?maxAge=3600)](https://github.com/OpenBB-finance/OpenBBTerminal/releases)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![TODOs](https://badgen.net/https/api.tickgit.com/badgen/github.com/OpenBB-finance/OpenBBTerminal/main)](https://www.tickgit.com/browse?repo=github.com/OpenBB-finance/OpenBBTerminal&branch=main)
@@ -45,9 +44,9 @@
   <p align="center">
     Investment research for everyone.
     <br />
-    <a href="https://github.com/OpenBB-finance/OpenBBTerminal/tree/master/openbb_terminal/README.md"><strong>≪  GETTING STARTED</strong></a>
+    <a href="https://docs.openbb.co/terminal/quickstart/installation"><strong>≪  GETTING STARTED</strong></a>
     &nbsp · &nbsp <a href="https://github.com/OpenBB-finance/OpenBBTerminal/tree/master/CONTRIBUTING.md"><strong>CONTRIBUTING</strong></a> &nbsp · &nbsp
-    <a href="https://openbb-finance.github.io/OpenBBTerminal/">
+    <a href="https://docs.openbb.co/terminal">
     <strong>SEE FEATURES »</strong></a>
     <br />
     <br />
@@ -98,14 +97,15 @@ If you wish to install the OpenBB Terminal or the OpenBB SDK, please use one of 
 
 |**OpenBB Terminal**|**Usage**|
 |:-|:-|
-|[Installer](https://openbb-finance.github.io/OpenBBTerminal/#accessing-the-openbb-terminal)|Recommended way if you just want to use the OpenBB Terminal|
-|[Docker](openbb_terminal/DOCKER_README.md)|An alternative way if you just want to use the OpenBB Terminal|
-|[Python](openbb_terminal/README.md#anaconda--python)|If you wish to contribute to the development of the OpenBB Terminal|
+|[Windows Installer](https://docs.openbb.co/terminal/quickstart/installation?tab=windows)|Recommended way for Windows if you just want to use the OpenBB Terminal|
+|[MacOS Installer](https://docs.openbb.co/terminal/quickstart/installation?tab=mac)|Recommended way for MacOS if you just want to use the OpenBB Terminal|
+|[Docker](https://docs.openbb.co/terminal/quickstart/installation?tab=docker)|An alternative way if you just want to use the OpenBB Terminal|
+|[Python](https://docs.openbb.co/terminal/quickstart/installation?tab=python)|If you wish to contribute to the development of the OpenBB Terminal|
 
 |**OpenBB SDK** &nbsp; &nbsp; &nbsp; &nbsp; |**Usage**|
 |:-|:-|
-|[PyPi](https://openbb-finance.github.io/OpenBBTerminal/SDK/)|Recommended way if you just want to use the OpenBB SDK|
-|[Python](openbb_terminal/README.md#anaconda--python)|If you wish to contribute to the development of the OpenBB SDK &nbsp; &nbsp; &nbsp; &nbsp;|
+|[PyPi](https://docs.openbb.co/sdk/quickstart/installation)|Recommended way if you just want to use the OpenBB SDK|
+|[Python](https://docs.openbb.co/terminal/quickstart/installation?tab=python)|If you wish to contribute to the development of the OpenBB SDK &nbsp; &nbsp; &nbsp; &nbsp;|
 
 ## 3. Contributing
 

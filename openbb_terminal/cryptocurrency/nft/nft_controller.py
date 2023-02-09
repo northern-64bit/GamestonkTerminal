@@ -32,33 +32,18 @@ class NFTController(BaseController):
         "fp",
     ]
     PATH = "/crypto/nft/"
+    CHOICES_GENERATION = True
 
     def __init__(self, queue: List[str] = None):
         """Constructor"""
         super().__init__(queue)
 
-        nft_price_floor_collections = nftpricefloor_model.get_collection_slugs()
+        self.nft_price_floor_collections = nftpricefloor_model.get_collection_slugs()
 
         if session and obbff.USE_PROMPT_TOOLKIT:
-            choices: dict = {c: {} for c in self.controller_choices}
+            choices: dict = self.choices_default
 
-            choices["support"] = self.SUPPORT_CHOICES
-            choices["about"] = self.ABOUT_CHOICES
-            choices["fp"] = {c: {} for c in nft_price_floor_collections}
-            choices["fp"]["--slug"] = {c: {} for c in nft_price_floor_collections}
-            choices["fp"]["--raw"] = {}
-            choices["fp"]["--limit"] = {str(c): {} for c in range(1, 100)}
-            choices["fp"]["-l"] = "--limit"
-            choices["stats"] = {
-                "--slug": None,
-                "-s": None,
-            }
-            choices["collections"] = {
-                "--fp": {},
-                "--sales": {},
-                "--limit": {str(c): {} for c in range(1, 50)},
-                "-l": "--limit",
-            }
+            choices["fp"].update({c: {} for c in self.nft_price_floor_collections})
 
             self.completer = NestedCompleter.from_nested_dict(choices)
 
@@ -90,6 +75,8 @@ class NFTController(BaseController):
             help="NFT floor price collection slug (e.g., bored-ape-yacht-club)",
             dest="slug",
             required="-h" not in other_args,
+            choices=self.nft_price_floor_collections,
+            metavar="SLUG",
         )
         if other_args and not other_args[0][0] == "-":
             other_args.insert(0, "--slug")
@@ -102,6 +89,9 @@ class NFTController(BaseController):
             nftpricefloor_view.display_floor_price(
                 slug=ns_parser.slug,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
                 raw=ns_parser.raw,
                 limit=ns_parser.limit,
             )
@@ -115,7 +105,7 @@ class NFTController(BaseController):
             prog="info",
             description="""
                 Display stats about an opensea nft collection. e.g. alien-frens
-                [Source: https://nftpricefloor.com/]
+                [Source: https://opensea.io]
             """,
         )
 
@@ -138,6 +128,9 @@ class NFTController(BaseController):
             opensea_view.display_collection_stats(
                 slug=ns_parser.slug,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -172,4 +165,7 @@ class NFTController(BaseController):
                 show_fp=ns_parser.fp,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )

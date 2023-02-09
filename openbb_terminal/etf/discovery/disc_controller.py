@@ -29,30 +29,14 @@ class DiscoveryController(BaseController):
         "active",
     ]
     PATH = "/etf/disc/"
+    CHOICES_GENERATION = True
 
     def __init__(self, queue: List[str] = None):
         """Constructor"""
         super().__init__(queue)
 
         if session and obbff.USE_PROMPT_TOOLKIT:
-            choices: dict = {c: {} for c in self.controller_choices}
-
-            one_to_hundred: dict = {str(c): {} for c in range(1, 100)}
-            choices["gainers"] = {
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            choices["decliners"] = {
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            choices["active"] = {
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-
-            choices["support"] = self.SUPPORT_CHOICES
-            choices["about"] = self.ABOUT_CHOICES
+            choices: dict = self.choices_default
 
             self.completer = NestedCompleter.from_nested_dict(choices)
 
@@ -78,7 +62,14 @@ class DiscoveryController(BaseController):
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED, limit=10
         )
         if ns_parser:
-            wsj_view.show_top_mover("gainers", ns_parser.limit, ns_parser.export)
+            wsj_view.show_top_mover(
+                "gainers",
+                ns_parser.limit,
+                ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
+            )
 
     @log_start_end(log=logger)
     def call_decliners(self, other_args):
@@ -97,7 +88,14 @@ class DiscoveryController(BaseController):
             limit=10,
         )
         if ns_parser:
-            wsj_view.show_top_mover("decliners", ns_parser.limit, ns_parser.export)
+            wsj_view.show_top_mover(
+                "decliners",
+                ns_parser.limit,
+                ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
+            )
 
     @log_start_end(log=logger)
     def call_active(self, other_args):
@@ -116,4 +114,11 @@ class DiscoveryController(BaseController):
             limit=10,
         )
         if ns_parser:
-            wsj_view.show_top_mover("active", ns_parser.limit, ns_parser.export)
+            wsj_view.show_top_mover(
+                "active",
+                ns_parser.limit,
+                ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
+            )

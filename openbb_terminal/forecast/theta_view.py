@@ -28,6 +28,7 @@ def display_theta_forecast(
     start_window: float = 0.85,
     forecast_horizon: int = 5,
     export: str = "",
+    sheet_name: str = None,
     residuals: bool = False,
     forecast_only: bool = False,
     start_date: Optional[datetime] = None,
@@ -42,9 +43,9 @@ def display_theta_forecast(
     ----------
     data : Union[pd.Series, np.array]
         Data to forecast
-    target_column (str, optional):
+    target_column: Optional[str]:
         Target column to forecast. Defaults to "close".
-    dataset_name str
+    dataset_name: str
         The name of the ticker to be predicted
     seasonal: str
         Seasonal component.  One of [N, A, M]
@@ -58,6 +59,8 @@ def display_theta_forecast(
         Size of sliding window from start of timeseries and onwards
     forecast_horizon: int
         Number of days to forecast when backtesting and retraining historical
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     residuals: bool
@@ -112,6 +115,7 @@ def display_theta_forecast(
         precision=precision,
         probabilistic=probabilistic,
         export=export,
+        sheet_name=sheet_name,
         forecast_only=forecast_only,
         naive=naive,
         export_pred_raw=export_pred_raw,

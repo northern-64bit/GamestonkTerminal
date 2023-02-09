@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from openbb_terminal.custom_prompt_toolkit import NestedCompleter
 
-from openbb_terminal import feature_flags as gtff
+from openbb_terminal import feature_flags as obbff
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
@@ -76,7 +76,7 @@ class ParametersController(BaseController):
         self.description: Optional[str] = None
         self.DATA_FILES = params_helpers.load_data_files()
 
-        if session and gtff.USE_PROMPT_TOOLKIT:
+        if session and obbff.USE_PROMPT_TOOLKIT:
             choices: dict = {c: {} for c in self.controller_choices}
             choices["set"] = {c: None for c in self.models}
             choices["set"]["--model"] = {c: None for c in self.models}
@@ -93,7 +93,14 @@ class ParametersController(BaseController):
                 "--show_arguments": {},
                 "-s": "--show_arguments",
             }
+            self.choices = choices
             self.completer = NestedCompleter.from_nested_dict(choices)
+
+    def update_runtime_choices(self):
+        if session and obbff.USE_PROMPT_TOOLKIT:
+            self.DATA_FILES = params_helpers.load_data_files()
+            self.choices["load"]["--file"] = {c: {} for c in self.DATA_FILES}
+            self.completer = NestedCompleter.from_nested_dict(self.choices)
 
     def print_help(self):
         """Print help"""
@@ -114,6 +121,7 @@ class ParametersController(BaseController):
             if self.current_model:
                 max_len = max(len(k) for k in self.params.keys())
                 for k, v in self.params.items():
+                    v = params_helpers.booltostr(v)
                     all_params = DEFAULT_PARAMETERS + MODEL_PARAMS[self.current_model]
                     if k in all_params:
                         mt.add_raw(
@@ -122,6 +130,7 @@ class ParametersController(BaseController):
             else:
                 max_len = max(len(k) for k in self.params.keys())
                 for k, v in self.params.items():
+                    v = params_helpers.booltostr(v)
                     mt.add_raw(
                         f"    [param]{k}{' ' * (max_len - len(k))} :[/param] {v}\n"
                     )
@@ -151,13 +160,13 @@ class ParametersController(BaseController):
             add_help=False,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             prog="file",
-            description="Load portfolio risk parameters (ini or xlsx)",
+            description="Select parameter file to use (ini or xlsx). The OpenBB Parameters Template can be "
+            "found inside the Portfolio Optimization documentation. Please type `about` to access the documentation.",
         )
 
         parser.add_argument(
             "-f",
             "--file",
-            required="-h" not in other_args,
             nargs="+",
             dest="file",
             help="Parameter file to be used",
@@ -168,16 +177,21 @@ class ParametersController(BaseController):
         ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         if ns_parser:
-            self.current_file = " ".join(ns_parser.file)
-
-            if self.current_file in self.DATA_FILES:
-                file_location = str(self.DATA_FILES[self.current_file])
+            if not ns_parser.file:
+                console.print(
+                    "[green]The OpenBB Parameters Template can be found inside "
+                    "the Portfolio Optimization documentation. Please type `about` "
+                    "to access the documentation. [green]\n"
+                )
             else:
-                file_location = str(self.current_file)
+                self.current_file = " ".join(ns_parser.file)
 
-            self.params, self.current_model = params_view.load_file(file_location)
+                if self.current_file in self.DATA_FILES:
+                    file_location = str(self.DATA_FILES[self.current_file])
+                else:
+                    file_location = str(self.current_file)
 
-            console.print()
+                self.params, self.current_model = params_view.load_file(file_location)
 
     @log_start_end(log=logger)
     def call_save(self, other_args: List[str]):
@@ -202,7 +216,8 @@ class ParametersController(BaseController):
         ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             self.current_file = str(params_view.save_file(ns_parser.file, self.params))
-            console.print()
+
+        self.update_runtime_choices()
 
     @log_start_end(log=logger)
     def call_clear(self, other_args: List[str]):
@@ -216,7 +231,6 @@ class ParametersController(BaseController):
         ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             self.current_model = ""
-            console.print("")
 
     @log_start_end(log=logger)
     def call_set(self, other_args: List[str]):
@@ -245,7 +259,6 @@ class ParametersController(BaseController):
                 )
                 return
             self.current_model = ns_parser.model
-            console.print("")
 
     @log_start_end(log=logger)
     def call_arg(self, other_args: List[str]):

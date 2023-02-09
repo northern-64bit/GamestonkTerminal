@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 @log_start_end(log=logger)
 @check_api_key(["API_FINNHUB_KEY"])
-def display_sentiment_stats(ticker: str, export: str = ""):
+def display_sentiment_stats(ticker: str, export: str = "", sheet_name: str = None):
     """
-    Sentiment stats which displays buzz, news score, articles last week, articles weekly average,
+    Prints Sentiment stats which displays buzz, news score, articles last week, articles weekly average,
     bullish vs bearish percentages, sector average bullish percentage, and sector average news score
 
     Parameters
@@ -55,8 +55,8 @@ Sector Average News Score: {round(100*d_stats['sectorAverageNewsScore'],2)} %"""
             os.path.dirname(os.path.abspath(__file__)),
             "stats",
             pd.DataFrame(d_stats),
+            sheet_name,
         )
 
     else:
         console.print("No sentiment stats found.")
-    console.print("")

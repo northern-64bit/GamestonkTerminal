@@ -14,10 +14,7 @@ from openbb_terminal import keys_model
 from openbb_terminal.core.config.paths import USER_ENV_FILE
 from openbb_terminal.custom_prompt_toolkit import NestedCompleter
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import (
-    EXPORT_ONLY_RAW_DATA_ALLOWED,
-    parse_simple_args,
-)
+from openbb_terminal.helper_funcs import EXPORT_ONLY_RAW_DATA_ALLOWED
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
 from openbb_terminal.rich_config import console, MenuText, translate
@@ -110,7 +107,13 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
         )
 
         if ns_parser:
-            keys_view.display_keys(show=ns_parser.show, export=ns_parser.export)
+            keys_view.display_keys(
+                show=ns_parser.show,
+                export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
+            )
 
     @log_start_end(log=logger)
     def call_av(self, other_args: List[str]):
@@ -136,7 +139,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["av"] = keys_model.set_av_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -166,7 +169,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["fmp"] = keys_model.set_fmp_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -194,7 +197,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["quandl"] = keys_model.set_quandl_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -222,7 +225,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["polygon"] = keys_model.set_polygon_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -250,7 +253,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["fred"] = keys_model.set_fred_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -278,7 +281,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["news"] = keys_model.set_news_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -306,7 +309,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["tradier"] = keys_model.set_tradier_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -333,7 +336,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
             return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["cmc"] = keys_model.set_cmc_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -360,7 +363,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
             return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["finnhub"] = keys_model.set_finnhub_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -387,7 +390,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
             return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["iex"] = keys_model.set_iex_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -446,9 +449,8 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
         if not other_args:
             console.print("For your API Key, visit: https://www.reddit.com\n")
             return
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
-
             slash_components = "".join([f"/{val}" for val in self.queue])
             useragent = " ".join(ns_parser.user_agent) + " " + slash_components
             useragent = useragent.replace('"', "")
@@ -500,7 +502,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
         if not other_args:
             console.print("For your API Key, visit: https://developer.twitter.com\n")
             return
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["twitter"] = keys_model.set_twitter_key(
                 key=ns_parser.key,
@@ -536,7 +538,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
         if not other_args:
             console.print("For your API Key, visit: https://robinhood.com/us/en/\n")
             return
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["rh"] = keys_model.set_rh_key(
                 username=ns_parser.username,
@@ -581,7 +583,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
         if not other_args:
             console.print("For your API Key, visit: https://www.degiro.fr\n")
             return
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["degiro"] = keys_model.set_degiro_key(
                 username=ns_parser.username,
@@ -624,7 +626,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
         if not other_args:
             console.print("For your API Key, visit: https://developer.oanda.com\n")
             return
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["oanda"] = keys_model.set_oanda_key(
                 account=ns_parser.account,
@@ -662,7 +664,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
         if not other_args:
             console.print("For your API Key, visit: https://binance.com\n")
             return
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["binance"] = keys_model.set_binance_key(
                 key=ns_parser.key,
@@ -692,7 +694,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
             return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["bitquery"] = keys_model.set_bitquery_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -719,7 +721,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
             return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["si"] = keys_model.set_si_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -761,7 +763,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
         if not other_args:
             console.print("For your API Key, visit: https://docs.pro.coinbase.com/\n")
             return
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["coinbase"] = keys_model.set_coinbase_key(
                 key=ns_parser.key,
@@ -792,7 +794,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
             return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["walert"] = keys_model.set_walert_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -821,7 +823,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
             return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["glassnode"] = keys_model.set_glassnode_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -850,7 +852,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
             return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["coinglass"] = keys_model.set_coinglass_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -879,7 +881,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
             return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["cpanic"] = keys_model.set_cpanic_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -908,7 +910,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
             return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["ethplorer"] = keys_model.set_ethplorer_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -942,7 +944,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
         if not other_args:
             console.print("For your API Key, visit: https://www.smartstake.io\n")
             return
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
 
         if ns_parser:
             self.status_dict["smartstake"] = keys_model.set_smartstake_key(
@@ -976,7 +978,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["github"] = keys_model.set_github_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -1004,7 +1006,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["messari"] = keys_model.set_messari_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -1033,12 +1035,13 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
             return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["eodhd"] = keys_model.set_eodhd_key(
                 key=ns_parser.key, persist=True, show_output=True
             )
 
+    @log_start_end(log=logger)
     def call_santiment(self, other_args: List[str]):
         """Process santiment command"""
         parser = argparse.ArgumentParser(
@@ -1062,7 +1065,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
             return
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["santiment"] = keys_model.set_santiment_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -1092,7 +1095,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["shroom"] = keys_model.set_shroom_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -1120,7 +1123,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["tokenterminal"] = keys_model.set_tokenterminal_key(
                 key=ns_parser.key, persist=True, show_output=True
@@ -1150,7 +1153,7 @@ class KeysController(BaseController):  # pylint: disable=too-many-public-methods
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-k")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             self.status_dict["stocksera"] = keys_model.set_stocksera_key(
                 key=ns_parser.key, persist=True, show_output=True

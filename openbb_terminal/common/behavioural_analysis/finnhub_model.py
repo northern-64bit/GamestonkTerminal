@@ -2,11 +2,10 @@
 __docformat__ = "numpy"
 
 import logging
-from typing import Dict
 
 import pandas as pd
-import requests
 
+from openbb_terminal.helper_funcs import request
 from openbb_terminal import config_terminal as cfg
 from openbb_terminal.decorators import check_api_key, log_start_end
 from openbb_terminal.rich_config import console
@@ -16,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 @log_start_end(log=logger)
 @check_api_key(["API_FINNHUB_KEY"])
-def get_sentiment_stats(ticker: str) -> Dict:
-    """Get sentiment stats [Source: finnhub]
+def get_sentiment_stats(ticker: str) -> pd.DataFrame:
+    """Get sentiment stats [Source: finnhub].
 
     Parameters
     ----------
@@ -26,10 +25,10 @@ def get_sentiment_stats(ticker: str) -> Dict:
 
     Returns
     -------
-    Dict
+    pd.DataFrame
         Get sentiment stats
     """
-    response = requests.get(
+    response = request(
         f"https://finnhub.io/api/v1/news-sentiment?symbol={ticker}&token={cfg.API_FINNHUB_KEY}"
     )
 

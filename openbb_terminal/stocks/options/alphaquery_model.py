@@ -3,10 +3,11 @@ __docformat__ = "numpy"
 
 import logging
 from datetime import datetime, timedelta
+from typing import Optional
 
 import pandas as pd
-import requests
 
+from openbb_terminal.helper_funcs import request
 from openbb_terminal.decorators import log_start_end
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 def get_put_call_ratio(
     symbol: str,
     window: int = 30,
-    start_date: str = (datetime.now() - timedelta(days=366)).strftime("%Y-%m-%d"),
+    start_date: Optional[str] = None,
 ) -> pd.DataFrame:
     """Gets put call ratio over last time window [Source: AlphaQuery.com]
 
@@ -26,9 +27,23 @@ def get_put_call_ratio(
         Ticker symbol to look for
     window: int, optional
         Window to consider, by default 30
-    start_date: str, optional
-        Start date to plot, by default last 366 days
+    start_date: Optional[str], optional
+        Start date to plot  (e.g., 2021-10-01), by default last 366 days
+
+    Returns
+    -------
+    pd.DataFrame
+        Put call ratio
+
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> pcr_df = openbb.stocks.options.pcr("B")
     """
+
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=366)).strftime("%Y-%m-%d")
+
     url = f"https://www.alphaquery.com/data/option-statistic-chart?ticker={symbol}\
         &perType={window}-Day&identifier=put-call-ratio-volume"
     headers = {
@@ -36,7 +51,7 @@ def get_put_call_ratio(
             Chrome/70.0.3538.77 Safari/537.36"
     }
 
-    r = requests.get(url, headers=headers)
+    r = request(url, headers=headers)
     if r.status_code != 200:
         return pd.DataFrame()
 

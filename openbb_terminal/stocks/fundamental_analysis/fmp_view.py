@@ -4,6 +4,7 @@ __docformat__ = "numpy"
 import logging
 import os
 
+import datetime
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -34,7 +35,6 @@ def valinvest_score(symbol: str):
     score = fmp_model.get_score(symbol)
     if score:
         console.print(f"Score: {score:.2f}".rstrip("0").rstrip(".") + " %")
-        console.print("")
 
 
 @log_start_end(log=logger)
@@ -87,7 +87,11 @@ def display_quote(symbol: str):
 @log_start_end(log=logger)
 @check_api_key(["API_KEY_FINANCIALMODELINGPREP"])
 def display_enterprise(
-    symbol: str, limit: int = 5, quarterly: bool = False, export: str = ""
+    symbol: str,
+    limit: int = 5,
+    quarterly: bool = False,
+    export: str = "",
+    sheet_name: str = None,
 ):
     """Financial Modeling Prep ticker enterprise
 
@@ -99,6 +103,8 @@ def display_enterprise(
         Number to get
     quarterly: bool
         Flag to get quarterly data
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     """
@@ -128,14 +134,22 @@ def display_enterprise(
         )
 
         export_data(
-            export, os.path.dirname(os.path.abspath(__file__)), "enterprise", df_fa
+            export,
+            os.path.dirname(os.path.abspath(__file__)),
+            "enterprise",
+            df_fa,
+            sheet_name,
         )
 
 
 @log_start_end(log=logger)
 @check_api_key(["API_KEY_FINANCIALMODELINGPREP"])
 def display_discounted_cash_flow(
-    symbol: str, limit: int = 5, quarterly: bool = False, export: str = ""
+    symbol: str,
+    limit: int = 5,
+    quarterly: bool = False,
+    export: str = "",
+    sheet_name: str = None,
 ):
     """Financial Modeling Prep ticker discounted cash flow
 
@@ -147,6 +161,8 @@ def display_discounted_cash_flow(
         Number to get
     quarterly: bool
         Flag to get quarterly data
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     """
@@ -159,7 +175,13 @@ def display_discounted_cash_flow(
     else:
         print_rich_table(dcf, title="Discounted Cash Flow", show_index=True)
 
-        export_data(export, os.path.dirname(os.path.abspath(__file__)), "dcf", dcf)
+        export_data(
+            export,
+            os.path.dirname(os.path.abspath(__file__)),
+            "dcf",
+            dcf,
+            sheet_name,
+        )
 
 
 @log_start_end(log=logger)
@@ -171,6 +193,7 @@ def display_income_statement(
     ratios: bool = False,
     plot: list = None,
     export: str = "",
+    sheet_name: str = None,
 ):
     """Financial Modeling Prep ticker income statement
 
@@ -186,6 +209,8 @@ def display_income_statement(
         Shows percentage change, by default False
     plot: list
         List of row labels to plot
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     """
@@ -241,7 +266,11 @@ def display_income_statement(
             console.print(income.loc["Link"].to_frame().to_string())
             console.print()
         export_data(
-            export, os.path.dirname(os.path.abspath(__file__)), "income", income
+            export,
+            os.path.dirname(os.path.abspath(__file__)),
+            "income",
+            income,
+            sheet_name,
         )
     else:
         logger.error("Could not get data")
@@ -257,6 +286,7 @@ def display_balance_sheet(
     ratios: bool = False,
     plot: list = None,
     export: str = "",
+    sheet_name: str = None,
 ):
     """Financial Modeling Prep ticker balance sheet
 
@@ -272,6 +302,8 @@ def display_balance_sheet(
         Shows percentage change, by default False
     plot: list
         List of row labels to plot
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     """
@@ -328,7 +360,11 @@ def display_balance_sheet(
             console.print(balance.loc["Link"].to_frame().to_string())
             console.print()
         export_data(
-            export, os.path.dirname(os.path.abspath(__file__)), "balance", balance
+            export,
+            os.path.dirname(os.path.abspath(__file__)),
+            "balance",
+            balance,
+            sheet_name,
         )
     else:
         logger.error("Could not get data")
@@ -344,6 +380,7 @@ def display_cash_flow(
     ratios: bool = False,
     plot: list = None,
     export: str = "",
+    sheet_name: str = None,
 ):
     """Financial Modeling Prep ticker cash flow
 
@@ -359,6 +396,8 @@ def display_cash_flow(
         Shows percentage change, by default False
     plot: list
         List of row labels to plot
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     """
@@ -412,7 +451,13 @@ def display_cash_flow(
             console.print()
             console.print(cash.loc["Link"].to_frame().to_string())
             console.print()
-        export_data(export, os.path.dirname(os.path.abspath(__file__)), "cash", cash)
+        export_data(
+            export,
+            os.path.dirname(os.path.abspath(__file__)),
+            "cash",
+            cash,
+            sheet_name,
+        )
     else:
         logger.error("Could not get data")
         console.print("[red]Could not get data[/red]\n")
@@ -421,7 +466,11 @@ def display_cash_flow(
 @log_start_end(log=logger)
 @check_api_key(["API_KEY_FINANCIALMODELINGPREP"])
 def display_key_metrics(
-    symbol: str, limit: int = 5, quarterly: bool = False, export: str = ""
+    symbol: str,
+    limit: int = 5,
+    quarterly: bool = False,
+    export: str = "",
+    sheet_name: str = None,
 ):
     """Financial Modeling Prep ticker key metrics
 
@@ -433,6 +482,8 @@ def display_key_metrics(
         Number to get
     quarterly: bool
         Flag to get quarterly data
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     """
@@ -448,7 +499,11 @@ def display_key_metrics(
         )
 
         export_data(
-            export, os.path.dirname(os.path.abspath(__file__)), "metrics", key_metrics
+            export,
+            os.path.dirname(os.path.abspath(__file__)),
+            "metrics",
+            key_metrics,
+            sheet_name,
         )
     else:
         logger.error("Could not get data")
@@ -458,7 +513,11 @@ def display_key_metrics(
 @log_start_end(log=logger)
 @check_api_key(["API_KEY_FINANCIALMODELINGPREP"])
 def display_financial_ratios(
-    symbol: str, limit: int = 5, quarterly: bool = False, export: str = ""
+    symbol: str,
+    limit: int = 5,
+    quarterly: bool = False,
+    export: str = "",
+    sheet_name: str = None,
 ):
     """Financial Modeling Prep ticker ratios
 
@@ -470,6 +529,8 @@ def display_financial_ratios(
         Number to get
     quarterly: bool
         Flag to get quarterly data
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     """
@@ -485,7 +546,11 @@ def display_financial_ratios(
         )
 
         export_data(
-            export, os.path.dirname(os.path.abspath(__file__)), "grratiosowth", ratios
+            export,
+            os.path.dirname(os.path.abspath(__file__)),
+            "grratiosowth",
+            ratios,
+            sheet_name,
         )
     else:
         logger.error("Could not get data")
@@ -495,7 +560,11 @@ def display_financial_ratios(
 @log_start_end(log=logger)
 @check_api_key(["API_KEY_FINANCIALMODELINGPREP"])
 def display_financial_statement_growth(
-    symbol: str, limit: int = 5, quarterly: bool = False, export: str = ""
+    symbol: str,
+    limit: int = 5,
+    quarterly: bool = False,
+    export: str = "",
+    sheet_name: str = None,
 ):
     """Financial Modeling Prep ticker growth
 
@@ -507,13 +576,14 @@ def display_financial_statement_growth(
         Number to get
     quarterly: bool
         Flag to get quarterly data
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     """
     growth = fmp_model.get_financial_growth(symbol, limit, quarterly)
 
     if not growth.empty:
-        growth = growth[growth.columns[::-1]]
         print_rich_table(
             growth,
             headers=list(growth.columns),
@@ -522,7 +592,86 @@ def display_financial_statement_growth(
         )
 
         export_data(
-            export, os.path.dirname(os.path.abspath(__file__)), "growth", growth
+            export,
+            os.path.dirname(os.path.abspath(__file__)),
+            "growth",
+            growth,
+            sheet_name,
+        )
+    else:
+        logger.error("Could not get data")
+        console.print("[red]Could not get data[/red]\n")
+
+
+@log_start_end(log=logger)
+@check_api_key(["API_KEY_FINANCIALMODELINGPREP"])
+def display_filings(
+    pages: int = 1,
+    limit: int = 5,
+    today: bool = False,
+    export: str = "",
+    sheet_name: str = None,
+) -> None:
+    """Display recent forms submitted to the SEC
+
+    Parameters
+    ----------
+
+    pages: int = 1
+        The range of most-rececnt pages to get entries from (1000 per page, max 30 pages)
+    limit: int = 5
+        Limit the number of entries to display (default: 5)
+    today: bool = False
+        Show all from today
+    export: str = ""
+        Export data as csv, json, or xlsx
+
+    Examples
+    --------
+
+    openbb.stocks.display_filings()
+
+    openbb.stocks.display_filings(today = True, export = "csv")
+    """
+    filings = fmp_model.get_filings(pages)
+    if today is True:
+        now: str = datetime.datetime.now().strftime("%Y-%m-%d")
+        iso_today: int = datetime.datetime.today().isoweekday()
+        if iso_today < 6 and not filings.empty:
+            filings = filings.filter(like=now, axis=0)
+            limit = 1000
+        else:
+            console.print(
+                "[red]No filings today, displaying the most recent submissions instead[/red]"
+            )
+
+    if not filings.empty:
+        filings.reset_index(["Date"], inplace=True)
+        for _, row in filings.head(limit).iterrows():
+            console.print(
+                "Timestamp: ",
+                f"{row['Date']}",
+                "  US/Eastern",
+                "\n",
+                "Ticker: ",
+                f"{row['Ticker']}",
+                "\n",
+                "CIK: " f"{row['CIK']}",
+                "\n",
+                "Form Type: ",
+                f"{row['Form Type']}",
+                "\n",
+                f"{row['Title']}",
+                "\n",
+                f"{row['URL']}\n",
+                sep="",
+            )
+        export_data(
+            export,
+            os.path.dirname(os.path.abspath(__file__)),
+            "filings",
+            filings,
+            sheet_name,
         )
     else:
         logger.error("Could not get data")

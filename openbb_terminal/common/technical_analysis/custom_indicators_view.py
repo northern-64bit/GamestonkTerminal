@@ -33,9 +33,10 @@ def fibonacci_retracement(
     end_date: Optional[Union[str, None]] = None,
     symbol: str = "",
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """Calculate fibonacci retracement levels
+    """Plots Calculated fibonacci retracement levels
 
     Parameters
     ----------
@@ -49,10 +50,18 @@ def fibonacci_retracement(
         User picked date for ending retracement
     symbol: str
         Ticker symbol
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     external_axes : Optional[List[plt.Axes]], optional
         External axes (2 axes are expected in the list), by default None
+
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> df = openbb.stocks.load(symbol="aapl")
+    >>> openbb.ta.fib_chart(data=df)
     """
     (
         df_fib,
@@ -132,4 +141,5 @@ def fibonacci_retracement(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "fib",
         df_fib,
+        sheet_name,
     )

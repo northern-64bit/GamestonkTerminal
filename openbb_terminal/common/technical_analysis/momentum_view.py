@@ -37,9 +37,10 @@ def display_cci(
     scalar: float = 0.0015,
     symbol: str = "",
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """Display CCI Indicator
+    """Plots CCI Indicator
 
     Parameters
     ----------
@@ -119,6 +120,7 @@ def display_cci(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "cci",
         df_ta,
+        sheet_name,
     )
 
 
@@ -130,9 +132,10 @@ def display_macd(
     n_signal: int = 9,
     symbol: str = "",
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """Plot MACD signal
+    """Plots MACD signal
 
     Parameters
     ----------
@@ -212,6 +215,7 @@ def display_macd(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "macd",
         df_ta,
+        sheet_name,
     )
 
 
@@ -223,9 +227,10 @@ def display_rsi(
     drift: int = 1,
     symbol: str = "",
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """Display RSI Indicator
+    """Plots RSI Indicator
 
     Parameters
     ----------
@@ -300,6 +305,7 @@ def display_rsi(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "rsi",
         df_ta,
+        sheet_name,
     )
 
 
@@ -311,9 +317,10 @@ def display_stoch(
     slowkperiod: int = 3,
     symbol: str = "",
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
-    """Plot stochastic oscillator signal
+    """Plots stochastic oscillator signal
 
     Parameters
     ----------
@@ -399,6 +406,7 @@ def display_stoch(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "stoch",
         df_ta,
+        sheet_name,
     )
 
 
@@ -408,9 +416,10 @@ def display_fisher(
     window: int = 14,
     symbol: str = "",
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """Display Fisher Indicator
+    """Plots Fisher Indicator
 
     Parameters
     ----------
@@ -492,6 +501,7 @@ def display_fisher(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "fisher",
         df_ta,
+        sheet_name,
     )
 
 
@@ -501,9 +511,10 @@ def display_cg(
     window: int = 14,
     symbol: str = "",
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """Display center of gravity Indicator
+    """Plots center of gravity Indicator
 
     Parameters
     ----------
@@ -563,6 +574,7 @@ def display_cg(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "cg",
         df_ta,
+        sheet_name,
     )
 
 
@@ -572,9 +584,10 @@ def display_clenow_momentum(
     symbol: str = "",
     window: int = 90,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """Display clenow momentum
+    """Prints table and plots clenow momentum
 
     Parameters
     ----------
@@ -589,9 +602,11 @@ def display_clenow_momentum(
     external_axes : Optional[List[plt.Axes]], optional
         External axes (2 axes are expected in the list), by default None
 
-    Returns
-    -------
-
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> df = openbb.stocks.load("AAPL")
+    >>> openbb.ta.clenow_chart(df["Close"])
     """
     r2, coef, fit_data = momentum_model.clenow_momentum(data, window)
 
@@ -636,6 +651,7 @@ def display_clenow_momentum(
         export,
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "clenow",
+        sheet_name,
     )
 
 
@@ -644,9 +660,10 @@ def display_demark(
     symbol: str = "",
     min_to_show: int = 5,
     export: str = "",
+    sheet_name: Optional[str] = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """Display demark squential indicator
+    """Plot demark sequential indicator
 
     Parameters
     ----------
@@ -661,9 +678,11 @@ def display_demark(
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axes are expected in the list), by default None
 
-    Returns
-    -------
-
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> df = openbb.stocks.load("AAPL")
+    >>> openbb.ta.demark_chart(df)
     """
     close_col = ta_helpers.check_columns(data, high=False, low=False)
     if close_col is None:
@@ -749,4 +768,5 @@ def display_demark(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "demark",
         stock_data,
+        sheet_name,
     )

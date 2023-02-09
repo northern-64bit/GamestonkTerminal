@@ -8,8 +8,9 @@ from time import sleep
 from typing import Any, Optional
 
 import pandas as pd
-import requests
 
+
+from openbb_terminal.helper_funcs import request
 import openbb_terminal.config_terminal as cfg
 from openbb_terminal.rich_config import console
 from openbb_terminal.cryptocurrency.dataframe_helpers import create_df_index
@@ -68,7 +69,7 @@ def split_cols_with_dot(column: str) -> str:
 
     Returns
     -------
-    str:
+    str
         Value of column with replaced format.
     """
 
@@ -86,8 +87,8 @@ def split_cols_with_dot(column: str) -> str:
             Index of string element.
 
         Returns
-        -------
-        str:
+        ----------
+        str
             Camel case string with no dots. E.g. price.availableSupply -> priceAvailableSupply.
         """
 
@@ -139,8 +140,8 @@ def make_request(
 
     Returns
     -------
-    dict
-    dictionary with response data
+    Optional[dict]
+        dictionary with response data
     """
 
     base_url = "https://api.ethplorer.io/"
@@ -155,7 +156,7 @@ def make_request(
         url += f"&limit={kwargs['limit']}"
 
     sleep(0.5)  # Limit is 2 API calls per 1 sec.
-    response = requests.get(url)
+    response = request(url)
     result = {}
 
     if response.status_code == 200:
@@ -183,8 +184,8 @@ def get_token_decimals(address: str) -> Optional[int]:
 
     Returns
     -------
-    pd.DataFrame:
-        DataFrame with list of tokens and their balances.
+    Optional[int]
+        Number of decimals for given token.
     """
     response = make_request("getTokenInfo", address)
     if response and "decimals" in response:
@@ -210,7 +211,7 @@ def get_address_info(
 
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         DataFrame with list of tokens and their balances.
     """
 
@@ -268,9 +269,16 @@ def get_address_info(
 def get_top_tokens(sortby: str = "rank", ascend: bool = False) -> pd.DataFrame:
     """Get top 50 tokens. [Source: Ethplorer]
 
+    Parameters
+    ----------
+    sortby: str
+        Key to sort by.
+    ascend: str
+        Sort in descending order.
+
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         DataFrame with list of top 50 tokens.
     """
 
@@ -296,7 +304,7 @@ def get_top_tokens(sortby: str = "rank", ascend: bool = False) -> pd.DataFrame:
 
 @log_start_end(log=logger)
 def get_top_token_holders(
-    address, sortby: str = "balance", ascend: bool = True
+    address: str, sortby: str = "balance", ascend: bool = True
 ) -> pd.DataFrame:
     """Get info about top token holders. [Source: Ethplorer]
 
@@ -311,7 +319,7 @@ def get_top_token_holders(
 
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         DataFrame with list of top token holders.
     """
 
@@ -327,7 +335,7 @@ def get_top_token_holders(
 
 @log_start_end(log=logger)
 def get_address_history(
-    address, sortby: str = "timestamp", ascend: bool = True
+    address: str, sortby: str = "timestamp", ascend: bool = True
 ) -> pd.DataFrame:
     """Get information about balance historical transactions. [Source: Ethplorer]
 
@@ -342,7 +350,7 @@ def get_address_history(
 
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         DataFrame with balance historical transactions (last 100)
     """
     response = make_request("getAddressHistory", address, limit=100)
@@ -380,7 +388,7 @@ def get_token_info(address) -> pd.DataFrame:
 
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         DataFrame with information about provided ERC20 token.
     """
 
@@ -434,7 +442,7 @@ def get_token_info(address) -> pd.DataFrame:
 
 
 @log_start_end(log=logger)
-def get_tx_info(tx_hash) -> pd.DataFrame:
+def get_tx_info(tx_hash: str) -> pd.DataFrame:
     """Get info about transaction. [Source: Ethplorer]
 
     Parameters
@@ -444,7 +452,7 @@ def get_tx_info(tx_hash) -> pd.DataFrame:
 
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         DataFrame with information about ERC20 token transaction.
     """
     decimals = None
@@ -480,7 +488,7 @@ def get_tx_info(tx_hash) -> pd.DataFrame:
 
 @log_start_end(log=logger)
 def get_token_history(
-    address, sortby: str = "timestamp", ascend: bool = False
+    address: str, sortby: str = "timestamp", ascend: bool = False
 ) -> pd.DataFrame:
     """Get info about token historical transactions. [Source: Ethplorer]
 
@@ -495,7 +503,7 @@ def get_token_history(
 
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         DataFrame with token historical transactions.
     """
 
@@ -536,7 +544,7 @@ def get_token_history(
 
 @log_start_end(log=logger)
 def get_token_historical_price(
-    address,
+    address: str,
     sortby: str = "date",
     ascend: bool = False,
 ) -> pd.DataFrame:
@@ -553,7 +561,7 @@ def get_token_historical_price(
 
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         DataFrame with token historical prices.
     """
 

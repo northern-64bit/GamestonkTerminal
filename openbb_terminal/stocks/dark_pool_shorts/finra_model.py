@@ -10,6 +10,7 @@ from scipy import stats
 
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.rich_config import console
+from openbb_terminal.helper_funcs import request
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +53,9 @@ def getFINRAweeks(tier: str = "T1", is_ats: bool = True) -> List:
         "sortFields": ["-weekStartDate"],
     }
 
-    response = requests.post(
+    response = request(
         "https://api.finra.org/data/group/otcMarket/name/weeklyDownloadDetails",
+        method="POST",
         headers=req_hdr,
         json=req_data,
     )
@@ -130,8 +132,9 @@ def getFINRAdata_offset(
         "sortFields": ["totalWeeklyShareQuantity"],
     }
 
-    return requests.post(
+    return request(
         "https://api.finra.org/data/group/otcMarket/name/weeklySummary",
+        method="POST",
         headers=req_hdr,
         json=req_data,
     )
@@ -155,10 +158,8 @@ def getFINRAdata(
 
     Returns
     -------
-    int
-        Status code from request
-    List
-        List of response data
+    Tuple[int, List]
+        Status code from request, List of response data
     """
     req_hdr = {"Accept": "application/json", "Content-Type": "application/json"}
 
@@ -200,8 +201,9 @@ def getFINRAdata(
         "sortFields": ["totalWeeklyShareQuantity"],
     }
 
-    response = requests.post(
+    response = request(
         "https://api.finra.org/data/group/otcMarket/name/weeklySummary",
+        method="POST",
         headers=req_hdr,
         json=req_data,
     )
@@ -225,10 +227,8 @@ def getATSdata(limit: int = 1000, tier_ats: str = "T1") -> Tuple[pd.DataFrame, D
 
     Returns
     -------
-    pd.DataFrame
-        Dark Pools (ATS) Data
-    Dict
-        Tickers from Dark Pools with better regression slope
+    Tuple[pd.DataFrame, Dict]
+        Dark Pools (ATS) Data, Tickers from Dark Pools with better regression slope
     """
     if tier_ats:
         tiers = [tier_ats]
@@ -304,10 +304,8 @@ def getTickerFINRAdata(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     Returns
     -------
-    pd.DataFrame
-        Dark Pools (ATS) Data
-    pd.DataFrame
-        OTC (Non-ATS) Data
+    Tuple[pd.DataFrame, pd.DataFrame]
+        Dark Pools (ATS) Data, OTC (Non-ATS) Data
     """
     tiers = ["T1", "T2", "OTCE"]
 

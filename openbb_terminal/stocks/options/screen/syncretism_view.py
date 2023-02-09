@@ -38,21 +38,22 @@ def view_available_presets(preset: str):
         preset_choices = syncretism_model.get_preset_choices()
         preset_filter.read(preset_choices[preset])
         filters_headers = ["FILTER"]
-        console.print("")
 
-        for filter_header in filters_headers:
+        for i, filter_header in enumerate(filters_headers):
             console.print(f" - {filter_header} -")
             d_filters = {**preset_filter[filter_header]}
             d_filters = {k: v for k, v in d_filters.items() if v}
+
             if d_filters:
                 max_len = len(max(d_filters, key=len)) + 2
                 for key, value in d_filters.items():
                     console.print(f"{key}{(max_len-len(key))*' '}: {value}")
-            console.print("")
+
+            if i < len(filters_headers) - 1:
+                console.print("\n")
 
     else:
         console.print("Please provide a preset template.")
-    console.print("")
 
 
 @log_start_end(log=logger)
@@ -60,6 +61,7 @@ def view_screener_output(
     preset: str,
     limit: int = 20,
     export: str = "",
+    sheet_name: str = None,
 ) -> List:
     """Print the output of screener
 
@@ -69,6 +71,8 @@ def view_screener_output(
         Chosen preset
     limit: int
         Number of randomly sorted rows to display
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format for export file
 
@@ -87,6 +91,7 @@ def view_screener_output(
         os.path.dirname(os.path.abspath(__file__)),
         "scr",
         df_res,
+        sheet_name,
     )
 
     if limit > 0:
@@ -113,6 +118,7 @@ def view_historical_greeks(
     raw: bool = False,
     limit: Union[int, str] = 20,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
     """Plots historical greeks for a given option. [Source: Syncretism]
@@ -135,6 +141,8 @@ def view_historical_greeks(
         Print to console
     limit: int
         Number of rows to show in raw
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     external_axes : Optional[List[plt.Axes]], optional
@@ -200,4 +208,5 @@ def view_historical_greeks(
         os.path.dirname(os.path.abspath(__file__)),
         "grhist",
         df,
+        sheet_name,
     )

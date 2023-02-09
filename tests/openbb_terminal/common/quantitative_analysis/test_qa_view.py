@@ -13,6 +13,8 @@ df = pd.DataFrame(data).set_index("date")
 df2 = pd.DataFrame(data2).set_index("date")
 series = pd.Series(dict(zip(dates, nums)), name="Series")
 
+# pylint: disable=unsupported-assignment-operation
+
 
 @pytest.mark.parametrize("val", [0.04, 1])
 def test_lambda_color_red(val):
@@ -20,22 +22,22 @@ def test_lambda_color_red(val):
 
 
 def test_display_summary():
-    qa_view.display_summary(pd.DataFrame(data, columns=["col1", "col2"]), "xlsx")
+    qa_view.display_summary(pd.DataFrame(data, columns=["col1", "col2"]), "xlsx", None)
 
 
 @pytest.mark.parametrize("df_use, external", [(df, None), (df2, None), (df, [1, 2])])
 def test_display_hist(df_use, external):
-    qa_view.display_hist("Data", df_use, "col2", 2, external)
+    qa_view.display_hist(df_use, "col2", "Data", 2, external)
 
 
 def test_display_hist_fail():
     with pytest.raises(Exception):
-        qa_view.display_hist("Data", df, "col1", 2, [MagicMock()])
+        qa_view.display_hist(df, "col1", "Data", 2, [MagicMock()])
 
 
 @pytest.mark.parametrize("external", [None, [1, 2]])
 def test_display_cdf(external):
-    qa_view.display_cdf(df, "col2", "Data", "xlsx", external)
+    qa_view.display_cdf(df, "col2", "Data", "xlsx", None, external)
 
 
 def test_display_cdf_fail():
@@ -75,7 +77,7 @@ def test_display_seasonal(yearly):
 
 
 def test_display_normality():
-    qa_view.display_normality(df, "col2", "xlsx")
+    qa_view.display_normality(df, "col2", "xlsx", None)
 
 
 def test_display_unitroot():

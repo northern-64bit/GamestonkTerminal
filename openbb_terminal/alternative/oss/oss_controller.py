@@ -29,37 +29,15 @@ class OSSController(BaseController):
 
     CHOICES_COMMANDS = ["sh", "tr", "rs", "rossidx"]
     PATH = "/alternative/oss/"
+    CHOICES_GENERATION = True
 
     def __init__(self, queue: List[str] = None):
         """Constructor"""
         super().__init__(queue)
 
         if session and obbff.USE_PROMPT_TOOLKIT:
-            choices: dict = {c: {} for c in self.controller_choices}
-            choices["rossidx"] = {
-                "--sortby": {c: {} for c in runa_model.SORT_COLUMNS},
-                "-s": "--sortby",
-                "--descend": {},
-                "--chart": {},
-                "-c": "--chart",
-                "--growth": {},
-                "-g": "--growth",
-                "--chart-type": {c: {} for c in ["stars", "forks"]},
-                "-t": "--chart-type",
-                "--limit": {str(c): {} for c in range(1, 50)},
-                "-l": "--limit",
-            }
-            choices["tr"] = {
-                "--sortby": {c: {} for c in ["stars", "forks"]},
-                "-s": "--sortby",
-                "--categories": None,
-                "-c": "--categories",
-                "--raw": {},
-                "--limit": {str(c): {} for c in range(1, 100)},
-                "-l": "--limit",
-            }
-            choices["rs"] = {"--raw": {}, "--repo": None, "-r": "--repo"}
-            choices["sh"] = {"--raw": {}, "--repo": None, "-r": "--repo"}
+            choices: dict = self.choices_default
+
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def parse_input(self, an_input: str) -> List:
@@ -143,7 +121,11 @@ class OSSController(BaseController):
         if ns_parser:
             if valid_repo(ns_parser.repo):
                 github_view.display_repo_summary(
-                    repo=ns_parser.repo, export=ns_parser.export
+                    repo=ns_parser.repo,
+                    export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
 
     @log_start_end(log=logger)
@@ -166,16 +148,21 @@ class OSSController(BaseController):
             nargs="+",
             help="Sort startups by column",
             default="Stars AGR [%]",
+            choices=runa_model.SORT_COLUMNS,
+            metavar="SORTBY",
         )
-
         parser.add_argument(
-            "--descend",
+            "-r",
+            "--reverse",
             action="store_true",
-            help="Flag to sort in descending order (lowest first)",
-            dest="descend",
+            dest="reverse",
             default=False,
+            help=(
+                "Data is sorted in descending order by default. "
+                "Reverse flag will sort it in an ascending way. "
+                "Only works when raw data is displayed."
+            ),
         )
-
         parser.add_argument(
             "-c",
             "--chart",
@@ -201,7 +188,6 @@ class OSSController(BaseController):
             default="stars",
             choices=["stars", "forks"],
         )
-
         ns_parser = self.parse_known_args_and_warn(
             parser,
             other_args,
@@ -212,12 +198,15 @@ class OSSController(BaseController):
         if ns_parser:
             runa_view.display_rossindex(
                 sortby=" ".join(ns_parser.sortby),
-                ascend=not ns_parser.descend,
+                ascend=ns_parser.reverse,
                 limit=ns_parser.limit,
                 show_chart=ns_parser.show_chart,
                 show_growth=ns_parser.show_growth,
                 chart_type=ns_parser.chart_type,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -262,4 +251,7 @@ class OSSController(BaseController):
                 categories=ns_parser.categories,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )

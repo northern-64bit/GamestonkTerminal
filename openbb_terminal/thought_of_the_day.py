@@ -5,10 +5,9 @@ from __future__ import annotations
 import random
 import re
 
-import requests
 from bs4 import BeautifulSoup
 
-from openbb_terminal.helper_funcs import get_user_agent
+from openbb_terminal.helper_funcs import request
 from openbb_terminal.rich_config import console
 
 __docformat__ = "numpy"
@@ -50,15 +49,12 @@ class ThoughtOfTheDay:
             Author key - Marcus_Aurelius, Epictetus, Seneca, Marcus_Tullius_Cicero, Aristotle, Plato, Pythagoras
 
         Returns
-        -------
+        ----------
         dict
             Metadata dictionary that includes number of quotes, number of pages and first 30 quotes
         """
         quotes_page = BeautifulSoup(
-            requests.get(
-                self.urls[author],
-                headers={"User-Agent": get_user_agent()},
-            ).text,
+            request(self.urls[author]).text,
             "lxml",
         )
 
@@ -103,7 +99,7 @@ class ThoughtOfTheDay:
             A quote formatted by Goodreads
 
         Returns
-        -------
+        ----------
         str
             A string version of the quote
         """
@@ -141,4 +137,4 @@ def get_thought_of_the_day():
         totd.quote_to_str(quotes[random.randint(0, len(quotes) - 1)])  # nosec
     )
 
-    console.print("")
+    console.print("\n")

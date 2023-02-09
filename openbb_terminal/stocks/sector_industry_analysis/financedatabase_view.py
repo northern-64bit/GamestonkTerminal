@@ -37,6 +37,7 @@ def display_bars_financials(
     exclude_exchanges: bool = True,
     limit: int = 10,
     export: str = "",
+    sheet_name: str = None,
     raw: bool = False,
     already_loaded_stocks_data: Dict = None,
     external_axes: Optional[List[plt.Axes]] = None,
@@ -61,6 +62,8 @@ def display_bars_financials(
         When you wish to include different exchanges use this boolean.
     limit: int
         Limit amount of companies displayed
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data as
     raw: bool
@@ -98,7 +101,6 @@ def display_bars_financials(
                 metric_data[stock_name] = (metric, symbol)
 
     if len(metric_data) > 1:
-
         metric_data = dict(
             OrderedDict(
                 sorted(metric_data.items(), key=lambda t: t[1][0], reverse=True)
@@ -140,7 +142,6 @@ def display_bars_financials(
                 df, headers=list(df.columns), show_index=False, title="Bars Financials"
             )
         else:
-
             # This plot has 1 axis
             if not external_axes:
                 _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
@@ -220,6 +221,7 @@ def display_bars_financials(
             os.path.dirname(os.path.abspath(__file__)),
             finance_metric,
             df_all,
+            sheet_name,
         )
 
         return stocks_data, company_tickers
@@ -240,6 +242,7 @@ def display_companies_per_sector_in_country(
     mktcap: str = "Large",
     exclude_exchanges: bool = True,
     export: str = "",
+    sheet_name: str = None,
     raw: bool = False,
     max_sectors_to_display: int = 15,
     min_pct_to_display_sector: float = 0.015,
@@ -255,6 +258,8 @@ def display_companies_per_sector_in_country(
         Select market cap of companies to consider from Small, Mid and Large
     exclude_exchanges : bool
         Exclude international exchanges
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data as
     raw: bool
@@ -309,7 +314,6 @@ def display_companies_per_sector_in_country(
             )
 
             if any(filter_sectors_to_display):
-
                 if not all(filter_sectors_to_display):
                     num_sectors_to_display = np.where(~filter_sectors_to_display)[0][0]
 
@@ -369,6 +373,7 @@ def display_companies_per_sector_in_country(
         os.path.dirname(os.path.abspath(__file__)),
         "cps",
         df,
+        sheet_name,
     )
 
 
@@ -378,6 +383,7 @@ def display_companies_per_industry_in_country(
     mktcap: str = "Large",
     exclude_exchanges: bool = True,
     export: str = "",
+    sheet_name: str = None,
     raw: bool = False,
     max_industries_to_display: int = 15,
     min_pct_to_display_industry: float = 0.015,
@@ -393,6 +399,8 @@ def display_companies_per_industry_in_country(
         Select market cap of companies to consider from Small, Mid and Large
     exclude_exchanges : bool
         Exclude international exchanges
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data as
     raw: bool
@@ -450,7 +458,6 @@ def display_companies_per_industry_in_country(
             )
 
             if any(filter_industries_to_display):
-
                 if not all(filter_industries_to_display):
                     num_industries_to_display = np.where(~filter_industries_to_display)[
                         0
@@ -465,7 +472,6 @@ def display_companies_per_industry_in_country(
                 )
 
             if len(companies_per_industry) > max_industries_to_display:
-
                 companies_per_industry_sliced = dict(
                     list(companies_per_industry.items())[
                         : max_industries_to_display - 1
@@ -512,13 +518,13 @@ def display_companies_per_industry_in_country(
             )
         else:
             console.print("No industry found. No pie chart will be depicted.")
-    console.print("")
 
     export_data(
         export,
         os.path.dirname(os.path.abspath(__file__)),
         "cpic",
         df,
+        sheet_name,
     )
 
 
@@ -528,6 +534,7 @@ def display_companies_per_industry_in_sector(
     mktcap: str = "Large",
     exclude_exchanges: bool = True,
     export: str = "",
+    sheet_name: str = None,
     raw: bool = False,
     max_industries_to_display: int = 15,
     min_pct_to_display_industry: float = 0.015,
@@ -543,6 +550,8 @@ def display_companies_per_industry_in_sector(
         Select market cap of companies to consider from Small, Mid and Large
     exclude_exchanges : bool
         Exclude international exchanges
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data as
     raw: bool
@@ -602,7 +611,6 @@ def display_companies_per_industry_in_sector(
             )
 
             if any(filter_industries_to_display):
-
                 if not all(filter_industries_to_display):
                     num_industries_to_display = np.where(~filter_industries_to_display)[
                         0
@@ -617,7 +625,6 @@ def display_companies_per_industry_in_sector(
                 )
 
             if len(companies_per_industry) > max_industries_to_display:
-
                 companies_per_industry_sliced = dict(
                     list(companies_per_industry.items())[
                         : max_industries_to_display - 1
@@ -669,6 +676,7 @@ def display_companies_per_industry_in_sector(
         os.path.dirname(os.path.abspath(__file__)),
         "cpis",
         df,
+        sheet_name,
     )
 
 
@@ -678,6 +686,7 @@ def display_companies_per_country_in_sector(
     mktcap: str = "Large",
     exclude_exchanges: bool = True,
     export: str = "",
+    sheet_name: str = None,
     raw: bool = False,
     max_countries_to_display: int = 15,
     min_pct_to_display_country: float = 0.015,
@@ -693,6 +702,8 @@ def display_companies_per_country_in_sector(
         Select market cap of companies to consider from Small, Mid and Large
     exclude_exchanges : bool
         Exclude international exchanges
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data as
     raw: bool
@@ -747,7 +758,6 @@ def display_companies_per_country_in_sector(
             )
 
             if any(filter_countries_to_display):
-
                 if not all(filter_countries_to_display):
                     num_countries_to_display = np.where(~filter_countries_to_display)[
                         0
@@ -762,7 +772,6 @@ def display_companies_per_country_in_sector(
                 )
 
             if len(companies_per_country) > max_countries_to_display:
-
                 companies_per_country_sliced = dict(
                     list(companies_per_country.items())[: max_countries_to_display - 1]
                 )
@@ -806,13 +815,13 @@ def display_companies_per_country_in_sector(
             )
         else:
             console.print("No country found. No pie chart will be depicted.")
-    console.print("")
 
     export_data(
         export,
         os.path.dirname(os.path.abspath(__file__)),
         "cpcs",
         df,
+        sheet_name,
     )
 
 
@@ -822,6 +831,7 @@ def display_companies_per_country_in_industry(
     mktcap: str = "Large",
     exclude_exchanges: bool = True,
     export: str = "",
+    sheet_name: str = None,
     raw: bool = False,
     max_countries_to_display: int = 15,
     min_pct_to_display_country: float = 0.015,
@@ -837,6 +847,8 @@ def display_companies_per_country_in_industry(
         Select market cap of companies to consider from Small, Mid and Large
     exclude_exchanges : bool
         Exclude international exchanges
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data as
     raw: bool
@@ -891,7 +903,6 @@ def display_companies_per_country_in_industry(
             )
 
             if any(filter_countries_to_display):
-
                 if not all(filter_countries_to_display):
                     num_countries_to_display = np.where(~filter_countries_to_display)[
                         0
@@ -906,7 +917,6 @@ def display_companies_per_country_in_industry(
                 )
 
             if len(companies_per_country) > max_countries_to_display:
-
                 companies_per_country_sliced = dict(
                     list(companies_per_country.items())[: max_countries_to_display - 1]
                 )
@@ -950,11 +960,11 @@ def display_companies_per_country_in_industry(
             )
         else:
             console.print("No country found. No pie chart will be depicted.")
-    console.print("")
 
     export_data(
         export,
         os.path.dirname(os.path.abspath(__file__)),
         "cpci",
         df,
+        sheet_name,
     )

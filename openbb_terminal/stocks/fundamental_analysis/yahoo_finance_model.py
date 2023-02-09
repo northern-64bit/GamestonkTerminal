@@ -2,25 +2,22 @@
 __docformat__ = "numpy"
 
 import logging
-from datetime import datetime, timedelta
-from typing import Tuple
-from urllib.request import Request, urlopen
 import re
-
 import ssl
+from datetime import datetime, timedelta
+from typing import Optional, Tuple
+from urllib.request import Request, urlopen
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
-
 from bs4 import BeautifulSoup
 
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.helper_funcs import lambda_long_number_format
+from openbb_terminal.helpers_denomination import transform as transform_by_denomination
 from openbb_terminal.rich_config import console
 from openbb_terminal.stocks.fundamental_analysis.fa_helper import clean_df_index
-from openbb_terminal.helpers_denomination import (
-    transform as transform_by_denomination,
-)
 
 logger = logging.getLogger(__name__)
 # pylint: disable=W0212
@@ -263,16 +260,30 @@ def get_dividends(symbol: str) -> pd.DataFrame:
 
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         Dataframe of dividends and dates
+
+    Examples
+    --------
+    >>> from openbb_terminal.sdk import openbb
+    >>> openbb.fa.divs("AAPL")
     """
-    return pd.DataFrame(yf.Ticker(symbol).dividends)
+    df = pd.DataFrame(yf.Ticker(symbol).dividends)
+
+    if df.empty:
+        console.print("No dividends found.\n")
+        return pd.DataFrame()
+
+    df["Change"] = df.diff()
+    df = df[::-1]
+
+    return df
 
 
 @log_start_end(log=logger)
 def get_mktcap(
     symbol: str,
-    start_date: str = (datetime.now() - timedelta(days=3 * 366)).strftime("%Y-%m-%d"),
+    start_date: Optional[str] = None,
 ) -> Tuple[pd.DataFrame, str]:
     """Get market cap over time for ticker. [Source: Yahoo Finance]
 
@@ -280,23 +291,28 @@ def get_mktcap(
     ----------
     symbol: str
         Ticker to get market cap over time
-    start_date: str
-        Start date to display market cap
+    start_date: Optional[str]
+        Initial date (e.g., 2021-10-01). Defaults to 3 years back
 
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         Dataframe of estimated market cap over time
     str:
         Currency of ticker
     """
-    currency = ""
-    df_data = yf.download(symbol, start=start_date, progress=False, threads=False)
-    if not df_data.empty:
 
-        data = yf.Ticker(symbol).info
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=3 * 366)).strftime("%Y-%m-%d")
+
+    currency = ""
+    df_data = yf.download(
+        symbol, start=start_date, progress=False, threads=False, ignore_tz=True
+    )
+    if not df_data.empty:
+        data = yf.Ticker(symbol).fast_info
         if data:
-            df_data["Adj Close"] = df_data["Adj Close"] * data["sharesOutstanding"]
+            df_data["Adj Close"] = df_data["Adj Close"] * data["shares"]
             df_data = df_data["Adj Close"]
 
             currency = data["currency"]
@@ -315,7 +331,7 @@ def get_splits(symbol: str) -> pd.DataFrame:
 
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         Dataframe of forward and reverse splits
     """
     data = yf.Ticker(symbol).splits
@@ -334,9 +350,11 @@ def get_financials(symbol: str, statement: str, ratios: bool = False) -> pd.Data
         Stock ticker symbol
     statement: str
         can be:
-            cash-flow
-            financials for Income
-            balance-sheet
+
+        - cash-flow
+        - financials for Income
+        - balance-sheet
+
     ratios: bool
         Shows percentage change
 
@@ -416,6 +434,7 @@ def get_financials(symbol: str, statement: str, ratios: bool = False) -> pd.Data
     df.replace("-", np.nan, inplace=True)
     df = df.dropna(how="all")
     df = df.replace(",", "", regex=True)
+    df = df.replace("k", "", regex=True)
     df = df.astype("float")
 
     # Data except EPS is returned in thousands, convert it
@@ -461,8 +480,12 @@ def get_earnings_history(symbol: str) -> pd.DataFrame:
     pd.DataFrame
         Dataframe of historical earnings if present
     """
-    earnings = yf.Ticker(symbol).earnings_history
-    return earnings
+    df = yf.Ticker(symbol).earnings_dates
+    df.reset_index(inplace=True)
+    df["Earnings Date"] = df["Earnings Date"].dt.strftime("%Y-%m-%d")
+    df.drop_duplicates(inplace=True)
+    df = df.fillna("-")
+    return df
 
 
 @log_start_end(log=logger)

@@ -73,7 +73,11 @@ def get_ordered_list_sources(command_path: str):
             json_doc = json.load(json_file)
 
         # If the user has added sources to their own sources file in OpenBBUserData, then use that
-        if user_data_source.exists() and user_data_source.stat().st_size > 0:
+        if (
+            not os.getenv("TEST_MODE")
+            and user_data_source.exists()
+            and user_data_source.stat().st_size > 0
+        ):
             with open(str(user_data_source)) as json_file:
                 json_doc = json.load(json_file)
 
@@ -94,7 +98,6 @@ def get_ordered_list_sources(command_path: str):
                 # If we have not find the `load` on the deepest level it means we may be in a sub-menu
                 # and we can use the load from the Base class
                 if path_objects[0] == "load":
-
                     # Get the context associated with the sub-menu (e.g. stocks, crypto, ...)
                     context = command_path.split("/")[1]
 

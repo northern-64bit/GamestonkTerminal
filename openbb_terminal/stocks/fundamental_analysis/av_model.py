@@ -6,11 +6,11 @@ from typing import Dict, List
 
 import numpy as np
 import pandas as pd
-import requests
+
 from alpha_vantage.fundamentaldata import FundamentalData
 from openbb_terminal import config_terminal as cfg
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import lambda_long_number_format
+from openbb_terminal.helper_funcs import lambda_long_number_format, request
 from openbb_terminal.rich_config import console
 from openbb_terminal.stocks.fundamental_analysis import yahoo_finance_model
 from openbb_terminal.stocks.stocks_helper import clean_fraction
@@ -26,7 +26,7 @@ def check_premium_key(json_response: Dict) -> bool:
         "any of the premium plans at https://www.alphavantage.co/premium/ to instantly unlock all premium endpoints"
     }:
         console.print(
-            "This is a premium endpoint for AlphaVantage. Please use a premium key\n"
+            "This is a premium endpoint for AlphaVantage. Please use a premium key.\n"
         )
         return True
     return False
@@ -48,7 +48,7 @@ def get_overview(symbol: str) -> pd.DataFrame:
     """
     # Request OVERVIEW data from Alpha Vantage API
     s_req = f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}&apikey={cfg.API_KEY_ALPHAVANTAGE}"
-    result = requests.get(s_req, stream=True)
+    result = request(s_req, stream=True)
     result_json = result.json()
 
     df_fa = pd.DataFrame()
@@ -113,7 +113,7 @@ def get_key_metrics(symbol: str) -> pd.DataFrame:
     """
     # Request OVERVIEW data
     s_req = f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}&apikey={cfg.API_KEY_ALPHAVANTAGE}"
-    result = requests.get(s_req, stream=True)
+    result = request(s_req, stream=True)
     result_json = result.json()
 
     # If the returned data was unsuccessful
@@ -190,7 +190,7 @@ def get_income_statements(
         f"https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol={symbol}"
         f"&apikey={cfg.API_KEY_ALPHAVANTAGE}"
     )
-    r = requests.get(url)
+    r = request(url)
     response_json = r.json()
     if check_premium_key(response_json):
         return pd.DataFrame()
@@ -278,7 +278,7 @@ def get_balance_sheet(
         DataFrame of the balance sheet
     """
     url = f"https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol={symbol}&apikey={cfg.API_KEY_ALPHAVANTAGE}"
-    r = requests.get(url)
+    r = request(url)
     response_json = r.json()
     if check_premium_key(response_json):
         return pd.DataFrame()
@@ -365,7 +365,7 @@ def get_cash_flow(
         Dataframe of cash flow statements
     """
     url = f"https://www.alphavantage.co/query?function=CASH_FLOW&symbol={symbol}&apikey={cfg.API_KEY_ALPHAVANTAGE}"
-    r = requests.get(url)
+    r = request(url)
     response_json = r.json()
     if check_premium_key(response_json):
         return pd.DataFrame()
@@ -447,7 +447,7 @@ def get_earnings(symbol: str, quarterly: bool = False) -> pd.DataFrame:
         "https://www.alphavantage.co/query?function=EARNINGS&"
         f"symbol={symbol}&apikey={cfg.API_KEY_ALPHAVANTAGE}"
     )
-    result = requests.get(s_req, stream=True)
+    result = request(s_req, stream=True)
     result_json = result.json()
     df_fa = pd.DataFrame()
 
@@ -459,7 +459,6 @@ def get_earnings(symbol: str, quarterly: bool = False) -> pd.DataFrame:
         if not result_json or len(result_json) < 2:
             console.print("No data found from Alpha Vantage\n")
         else:
-
             df_fa = pd.json_normalize(result_json)
 
             if quarterly:
@@ -560,7 +559,7 @@ def color_mscore(value: str) -> str:
         The string value
 
     Returns
-    ----------
+    -------
     new_value : str
         The string formatted with rich color
     """
@@ -580,7 +579,7 @@ def color_zscore_mckee(value: str) -> str:
         The string value
 
     Returns
-    ----------
+    -------
     new_value : str
         The string formatted with rich color
     """
@@ -614,8 +613,11 @@ def get_fraud_ratios(symbol: str, detail: bool = False) -> pd.DataFrame:
         df_bs, _ = fd.get_balance_sheet_annual(symbol=symbol)
         df_is, _ = fd.get_income_statement_annual(symbol=symbol)
 
-    except Exception as e:
-        console.print(e)
+    except ValueError as e:
+        if "premium endpoint" in str(e):
+            console.print(
+                "This is a premium endpoint for AlphaVantage. Please use a premium key.\n"
+            )
         return pd.DataFrame()
 
     # pylint: disable=no-member
@@ -729,8 +731,11 @@ def get_dupont(symbol: str) -> pd.DataFrame:
         df_bs, _ = fd.get_balance_sheet_annual(symbol=symbol)
         df_is, _ = fd.get_income_statement_annual(symbol=symbol)
 
-    except Exception as e:
-        console.print(e)
+    except ValueError as e:
+        if "premium endpoint" in str(e):
+            console.print(
+                "This is a premium endpoint for AlphaVantage. Please use a premium key.\n"
+            )
         return pd.DataFrame()
 
     # pylint: disable=no-member

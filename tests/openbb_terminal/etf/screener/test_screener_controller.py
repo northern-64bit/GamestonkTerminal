@@ -219,7 +219,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
     [
         (
             "call_screen",
-            ["-l=10", "-s=NAV", "-a"],
+            ["-l=10", "-s=NAV", "-r"],
             "screener_view.view_screener",
             [],
             dict(
@@ -228,6 +228,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
                 sortby="NAV",
                 ascend=True,
                 export="",
+                sheet_name=None,
             ),
         ),
         (
@@ -235,7 +236,7 @@ def test_call_func_expect_queue(expected_queue, func, queue):
             ["Bank Loan", "-l=3"],
             "financedatabase_view.display_etf_by_category",
             [],
-            dict(category="Bank Loan", limit=3, export=""),
+            dict(category="Bank Loan", limit=3, export="", sheet_name=None),
         ),
         (
             "call_view",

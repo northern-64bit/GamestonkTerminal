@@ -26,18 +26,21 @@ logger = logging.getLogger(__name__)
 
 @log_start_end(log=logger)
 def display_star_history(
-    repo: str, export: str = "", external_axes: Optional[List[plt.Axes]] = None
+    repo: str,
+    export: str = "",
+    sheet_name: str = None,
+    external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
-    """Display repo summary [Source: https://api.github.com]
+    """Plots repo summary [Source: https://api.github.com].
 
     Parameters
     ----------
     repo : str
-            Repository to display star history. Format: org/repo, e.g., openbb-finance/openbbterminal
+        Repository to display star history. Format: org/repo, e.g., openbb-finance/openbbterminal
     export : str
-            Export dataframe data to csv,json,xlsx file
+        Export dataframe data to csv,json,xlsx file
     external_axes : Optional[List[plt.Axes]], optional
-            External axes (1 axis is expected in the list), by default None
+        External axes (1 axis is expected in the list), by default None
     """
     df = github_model.get_stars_history(repo)
     if not df.empty:
@@ -58,7 +61,13 @@ def display_star_history(
         if external_axes is None:
             theme.visualize_output()
 
-        export_data(export, os.path.dirname(os.path.abspath(__file__)), "sh", df)
+        export_data(
+            export,
+            os.path.dirname(os.path.abspath(__file__)),
+            "sh",
+            df,
+            sheet_name,
+        )
 
 
 @log_start_end(log=logger)
@@ -67,9 +76,10 @@ def display_top_repos(
     categories: str = "",
     limit: int = 10,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
-    """Display repo summary [Source: https://api.github.com]
+    """Plots repo summary [Source: https://api.github.com].
 
     Parameters
     ----------
@@ -116,17 +126,23 @@ def display_top_repos(
         if external_axes is None:
             theme.visualize_output()
 
-        export_data(export, os.path.dirname(os.path.abspath(__file__)), "tr", df)
+        export_data(
+            export,
+            os.path.dirname(os.path.abspath(__file__)),
+            "tr",
+            df,
+            sheet_name,
+        )
 
 
 @log_start_end(log=logger)
-def display_repo_summary(repo: str, export: str = "") -> None:
-    """Display repo summary [Source: https://api.github.com]
+def display_repo_summary(repo: str, export: str = "", sheet_name: str = None) -> None:
+    """Prints table showing repo summary [Source: https://api.github.com].
 
     Parameters
     ----------
     repo : str
-            Repository to display summary. Format: org/repo, e.g., openbb-finance/openbbterminal
+        Repository to display summary. Format: org/repo, e.g., openbb-finance/openbbterminal
     export : str
         Export dataframe data to csv,json,xlsx file
     """
@@ -141,4 +157,5 @@ def display_repo_summary(repo: str, export: str = "") -> None:
             os.path.dirname(os.path.abspath(__file__)),
             "rs",
             data,
+            sheet_name,
         )

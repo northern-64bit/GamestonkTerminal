@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, timedelta
-
-import requests
+from typing import Optional
 
 import pandas as pd
 
@@ -9,6 +8,7 @@ from openbb_terminal import config_terminal as cfg
 from openbb_terminal.decorators import check_api_key, log_start_end
 from openbb_terminal.rich_config import console
 from openbb_terminal.cryptocurrency.discovery.pycoingecko_model import read_file_data
+from openbb_terminal.helper_funcs import request
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +30,8 @@ def get_github_activity(
     symbol: str,
     dev_activity: bool = False,
     interval: str = "1d",
-    start_date: str = (datetime.now() - timedelta(days=365)).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    ),
-    end_date: str = (datetime.now()).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
 ) -> pd.DataFrame:
     """Returns  a list of developer activity for a given coin and time interval.
 
@@ -45,18 +43,26 @@ def get_github_activity(
         Crypto symbol to check github activity
     dev_activity: bool
         Whether to filter only for development activity
-    start_date : int
-        Initial date like string (e.g., 2021-10-01)
-    end_date : int
-        End date like string (e.g., 2021-10-01)
     interval : str
         Interval frequency (e.g., 1d)
+    start_date : Optional[str]
+        Initial date like string (e.g., 2021-10-01)
+    end_date : Optional[str]
+        End date like string (e.g., 2021-10-01)
 
     Returns
     -------
     pd.DataFrame
         developer activity over time
     """
+
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=365)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+
+    if end_date is None:
+        end_date = (datetime.now()).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     activity_type = "dev_activity" if dev_activity else "github_activity"
 
@@ -72,14 +78,13 @@ def get_github_activity(
         f'from: "{start_date}" to: "{end_date}" interval: "{interval}"){{ datetime value }} }} }}'
     )
 
-    response = requests.post(
-        "https://api.santiment.net/graphql", headers=headers, data=data
+    response = request(
+        "https://api.santiment.net/graphql", method="POST", headers=headers, data=data
     )
 
     df = pd.DataFrame()
 
     if response.status_code == 200:
-
         if "getMetric" in response.json()["data"]:
             df = pd.DataFrame(response.json()["data"]["getMetric"]["timeseriesData"])
             df["datetime"] = pd.to_datetime(df["datetime"])

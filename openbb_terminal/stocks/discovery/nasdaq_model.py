@@ -9,7 +9,7 @@ import requests
 
 import openbb_terminal.config_terminal as cfg
 from openbb_terminal.decorators import check_api_key, log_start_end
-from openbb_terminal.helper_funcs import get_user_agent
+from openbb_terminal.helper_funcs import get_user_agent, request
 from openbb_terminal.rich_config import console
 
 
@@ -26,7 +26,7 @@ def get_retail_tickers() -> pd.DataFrame:
     pd.DataFrame
         Dataframe of tickers
     """
-    r = requests.get(
+    r = request(
         f"https://data.nasdaq.com/api/v3/datatables/NDAQ/RTAT10/?api_key={cfg.API_KEY_QUANDL}"
     )
 
@@ -38,21 +38,18 @@ def get_retail_tickers() -> pd.DataFrame:
     # Wrong API Key
     elif r.status_code == 400:
         console.print(r.text)
-        console.print("\n")
     # Premium Feature
     elif r.status_code == 403:
         console.print(r.text)
-        console.print("\n")
     # Catching other exception
     elif r.status_code != 200:
         console.print(r.text)
-        console.print("\n")
 
     return df
 
 
 @log_start_end(log=logger)
-def get_dividend_cal(date: str = datetime.today().strftime("%Y-%m-%d")) -> pd.DataFrame:
+def get_dividend_cal(date: str = None) -> pd.DataFrame:
     """Gets dividend calendar for given date.  Date represents Ex-Dividend Date
 
     Parameters
@@ -62,7 +59,7 @@ def get_dividend_cal(date: str = datetime.today().strftime("%Y-%m-%d")) -> pd.Da
 
     Returns
     -------
-    pd.DataFrame:
+    pd.DataFrame
         Dataframe of dividend calendar
     """
     # TODO: HELP WANTED:
@@ -70,6 +67,9 @@ def get_dividend_cal(date: str = datetime.today().strftime("%Y-%m-%d")) -> pd.Da
     # that you might be using, etc. More exploration is required to make this feature
     # equally usable for all. In the time being we patch selection of the user agent and
     # add a timeout for cases when the URL doesn't respond.
+
+    if date is None:
+        date = datetime.today().strftime("%Y-%m-%d")
 
     ag = get_user_agent()
     # Nasdaq API doesn't like this user agent, thus we always get other than this particular one
@@ -79,10 +79,9 @@ def get_dividend_cal(date: str = datetime.today().strftime("%Y-%m-%d")) -> pd.Da
     ):
         ag = get_user_agent()
     try:
-        r = requests.get(
+        r = request(
             f"https://api.nasdaq.com/api/calendar/dividends?date={date}",
             headers={"User-Agent": ag},
-            timeout=5,
         )
 
         df = pd.DataFrame()

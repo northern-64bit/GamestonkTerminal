@@ -1,5 +1,6 @@
 {
   "stocks": {
+    "filings": ["FinancialModelingPrep"],
     "search": ["FinanceDatabase"],
     "quote": ["YahooFinance"],
     "tob": ["CBOE"],
@@ -12,7 +13,8 @@
       "open": ["Bursa"],
       "closed": ["Bursa"],
       "all": ["Bursa"],
-      "exchange": ["Bursa"]
+      "exchange": ["Bursa"],
+      "holidays":["PandasMarketCalendars"]
     },
     "options": {
       "unu": ["FDScanner"],
@@ -238,6 +240,8 @@
       "metrics": ["FinancialModelingPrep"],
       "ratios": ["FinancialModelingPrep"],
       "growth": ["FinancialModelingPrep"],
+      "revfc": ["SeekingAlpha"],
+      "epsfc": ["SeekingAlpha"],
       "warnings": ["MarketWatch"],
       "dcf": ["StockAnalysis"],
       "dcfc": ["FinancialModelingPrep"],
@@ -287,6 +291,7 @@
     }
   },
   "crypto": {
+    "price": ["Pyth"],
     "load": ["YahooFinance", "CoinGecko", "CCXT"],
     "find": ["CoinGecko", "CoinPaprika", "Binance", "Coinbase", "YahooFinance"],
     "headlines": ["FinBrain"],
@@ -333,6 +338,7 @@
       "hr": ["Glassnode"],
       "btccp": ["Blockchain"],
       "btcct": ["Blockchain"],
+      "btcblockdata": ["Blockchain"],
       "gwei": ["ETHGasStations"],
       "whales": ["WhaleAlert"],
       "lt": ["BitQuery"],
@@ -464,8 +470,8 @@
     "futures": ["WallStreetJournal", "Finviz"],
     "map": ["Finviz"],
     "bigmac": ["Nasdaq"],
-    "ycrv": ["FRED","Investing"],
-    "events": ["Nasdaq","Investing"],
+    "ycrv": ["FRED"],
+    "events": ["Nasdaq"],
     "edebt": ["Wikipedia"],
     "rtps": ["AlphaVantage"],
     "valuation": ["Finviz"],
@@ -504,6 +510,7 @@
       "rs": ["GitHub"],
       "sh": ["GitHub"],
       "tr": ["GitHub"]
-    }
+    },
+    "hn": ["HackerNews"]
   }
 }

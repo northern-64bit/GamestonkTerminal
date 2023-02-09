@@ -1,16 +1,15 @@
 """ Comparison Analysis Marketwatch Model """
 __docformat__ = "numpy"
 
-from datetime import datetime
 import logging
+from datetime import datetime
 from typing import Dict, List, Tuple
 
 import pandas as pd
-import requests
 from bs4 import BeautifulSoup
 
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import get_user_agent
+from openbb_terminal.helper_funcs import get_user_agent, request
 from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
@@ -23,7 +22,7 @@ def get_financial_comparisons(
     timeframe: str = str(datetime.now().year - 1),
     quarter: bool = False,
 ) -> pd.DataFrame:
-    """Get dataframe of income data from marketwatch
+    """Get dataframe of income data from marketwatch.
 
     Parameters
     ----------
@@ -40,7 +39,7 @@ def get_financial_comparisons(
     Returns
     -------
     pd.DataFrame
-        Dataframe of income statements
+        Dataframe of financial statements
 
     Raises
     ------
@@ -49,7 +48,7 @@ def get_financial_comparisons(
     """
     l_timeframes, ddf_financials = prepare_comparison_financials(symbols, data, quarter)
 
-    if timeframe:
+    if timeframe and l_timeframes:
         if (timeframe == str(datetime.now().year - 1)) and quarter:
             timeframe = l_timeframes[-1]
         elif timeframe not in l_timeframes:
@@ -75,8 +74,8 @@ def get_income_comparison(
     similar: List[str],
     timeframe: str = str(datetime.today().year - 1),
     quarter: bool = False,
-):
-    """Get income data. [Source: Marketwatch]
+) -> pd.DataFrame:
+    """Get income data. [Source: Marketwatch].
 
     Parameters
     ----------
@@ -90,6 +89,11 @@ def get_income_comparison(
         Whether to use quarterly statements, by default False
     export : str, optional
         Format to export data
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe of income statements
     """
     df_financials_compared = get_financial_comparisons(
         similar, "income", timeframe, quarter
@@ -103,8 +107,8 @@ def get_balance_comparison(
     similar: List[str],
     timeframe: str = str(datetime.today().year - 1),
     quarter: bool = False,
-):
-    """Get balance data. [Source: Marketwatch]
+) -> pd.DataFrame:
+    """Get balance data. [Source: Marketwatch].
 
     Parameters
     ----------
@@ -118,6 +122,11 @@ def get_balance_comparison(
         Whether to use quarterly statements, by default False
     export : str, optional
         Format to export data
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe of balance comparisons
     """
     df_financials_compared = get_financial_comparisons(
         similar, "balance", timeframe, quarter
@@ -131,7 +140,7 @@ def get_cashflow_comparison(
     similar: List[str],
     timeframe: str = str(datetime.today().year - 1),
     quarter: bool = False,
-):
+) -> pd.DataFrame:
     """Get cashflow data. [Source: Marketwatch]
 
     Parameters
@@ -146,6 +155,11 @@ def get_cashflow_comparison(
         Whether to use quarterly statements, by default False
     export : str, optional
         Format to export data
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe of cashflow comparisons
     """
     df_financials_compared = get_financial_comparisons(
         similar, "cashflow", timeframe, quarter
@@ -158,7 +172,7 @@ def get_cashflow_comparison(
 def prepare_df_financials(
     ticker: str, statement: str, quarter: bool = False
 ) -> pd.DataFrame:
-    """Builds a DataFrame with financial statements for a given company
+    """Builds a DataFrame with financial statements for a given company.
 
     Parameters
     ----------
@@ -200,7 +214,7 @@ def prepare_df_financials(
     try:
         period = "quarter" if quarter else "annual"
         text_soup_financials = BeautifulSoup(
-            requests.get(
+            request(
                 financial_urls[statement][period].format(ticker),
                 headers={"User-Agent": get_user_agent()},
             ).text,
@@ -279,18 +293,18 @@ def prepare_comparison_financials(
 
     Returns
     -------
-    List[str]
-        List of index headers
-    Dict[str, pd.DataFrame]
+    Tuple[List[str], Dict[str, pd.DataFrame]]
+        List of index headers,
         A dictionary of DataFrame with financial info from list of similar tickers
     """
 
+    if not similar:
+        console.print("[red]No similar tickers found.")
+        return [], {}
+
     financials = {}
-    for (
-        symbol
-    ) in (
-        similar.copy()
-    ):  # We need a copy since we are modifying the original potentially
+    # We need a copy since we are modifying the original potentially
+    for symbol in similar.copy():
         results = prepare_df_financials(symbol, statement, quarter)
         if results.empty:
             # If we have an empty result set, don't do further analysis on this symbol and remove it from consideration
@@ -343,6 +357,7 @@ def combine_similar_financials(
         Column label, which is a timeframe
     quarter: bool
         False for yearly data, True for quarterly
+
     Returns
     -------
     pd.DataFrame

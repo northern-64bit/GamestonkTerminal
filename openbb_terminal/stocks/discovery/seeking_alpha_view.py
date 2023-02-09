@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 @log_start_end(log=logger)
 def upcoming_earning_release_dates(
-    num_pages: int = 5, limit: int = 1, export: str = ""
+    num_pages: int = 5, limit: int = 1, export: str = "", sheet_name: str = None
 ):
     """Displays upcoming earnings release dates
 
@@ -84,11 +84,14 @@ def upcoming_earning_release_dates(
             os.path.dirname(os.path.abspath(__file__)),
             "upcoming",
             df_data,
+            sheet_name,
         )
 
 
 @log_start_end(log=logger)
-def news(article_id: int = -1, limit: int = 5, export: str = ""):
+def news(
+    article_id: int = -1, limit: int = 5, export: str = "", sheet_name: str = None
+):
     """Prints the latest news article list. [Source: Seeking Alpha]
 
     Parameters
@@ -97,7 +100,6 @@ def news(article_id: int = -1, limit: int = 5, export: str = ""):
         Article ID. If -1, none is selected
     limit: int
         Number of articles to display. Only used if article_id is -1.
-
     export : str
         Export dataframe data to csv,json,xlsx file
     """
@@ -117,7 +119,7 @@ def news(article_id: int = -1, limit: int = 5, export: str = ""):
                 article["title"],
             )
             console.print(article["url"])
-            console.print("")
+            console.print("\n")
 
             if idx >= limit - 1:
                 break
@@ -137,7 +139,7 @@ def news(article_id: int = -1, limit: int = 5, export: str = ""):
             article["title"],
         )
         console.print(article["url"])
-        console.print("")
+        console.print("\n")
         console.print(article["content"])
 
     if export:
@@ -146,11 +148,17 @@ def news(article_id: int = -1, limit: int = 5, export: str = ""):
             os.path.dirname(os.path.abspath(__file__)),
             "trending",
             df_articles,
+            sheet_name,
         )
 
 
 @log_start_end(log=logger)
-def display_news(news_type: str = "Top-News", limit: int = 5, export: str = ""):
+def display_news(
+    news_type: str = "Top-News",
+    limit: int = 5,
+    export: str = "",
+    sheet_name: str = None,
+):
     """Display news. [Source: SeekingAlpha]
 
     Parameters
@@ -178,11 +186,12 @@ def display_news(news_type: str = "Top-News", limit: int = 5, export: str = ""):
                 + news_element["title"]
             )
             console.print(news_element["url"])
-            console.print("")
+            console.print("\n")
 
         export_data(
             export,
             os.path.dirname(os.path.abspath(__file__)),
             "cnews : " + news_type,
             pd.DataFrame(news_to_display),
+            sheet_name,
         )

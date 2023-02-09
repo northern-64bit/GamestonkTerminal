@@ -6,10 +6,9 @@ from typing import Optional
 import logging
 
 import pandas as pd
-import requests
 
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import get_user_agent
+from openbb_terminal.helper_funcs import get_user_agent, request
 from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
@@ -49,9 +48,10 @@ def _make_request(url: str, verbose: bool = True) -> Optional[dict]:
         endpoint url
     verbose: bool
         whether to print the text from the response
+
     Returns
     -------
-    dict:
+    Optional[dict]:
         dictionary with response data
     """
 
@@ -60,7 +60,7 @@ def _make_request(url: str, verbose: bool = True) -> Optional[dict]:
         "User-Agent": get_user_agent(),
         "referer": "https://dappradar.com/",
     }
-    response = requests.get(url, headers=headers)
+    response = request(url, headers=headers)
     if not 200 <= response.status_code < 300:
         if verbose:
             console.print(f"[red]dappradar api exception: {response.text}[/red]")
@@ -170,6 +170,7 @@ def get_top_games(sortby: str = "", limit: int = 10) -> pd.DataFrame:
         Number of records to display
     sortby: str
         Key by which to sort data
+
     Returns
     -------
     pd.DataFrame

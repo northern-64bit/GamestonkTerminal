@@ -3,9 +3,10 @@ __docformat__ = "numpy"
 
 # IMPORTATION STANDARD
 import argparse
-from pathlib import Path
 import json
 import logging
+import os
+from pathlib import Path
 from typing import List, Dict
 
 # IMPORTATION THIRDPARTY
@@ -18,7 +19,6 @@ from openbb_terminal.decorators import log_start_end
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
 from openbb_terminal.rich_config import console, MenuText
-from openbb_terminal.helper_funcs import parse_simple_args
 
 # pylint: disable=too-many-lines,no-member,too-many-public-methods,C0302
 # pylint:disable=import-outside-toplevel
@@ -55,7 +55,11 @@ class SourcesController(BaseController):
             self.json_doc = json.load(json_file)
 
         # If the user has added sources to their own sources file in OpenBBUserData, then use that
-        if user_data_source.exists() and user_data_source.stat().st_size > 0:
+        if (
+            not os.getenv("TEST_MODE")
+            and user_data_source.exists()
+            and user_data_source.stat().st_size > 0
+        ):
             with open(str(user_data_source)) as json_file:
                 self.json_doc = json.load(json_file)
 
@@ -116,7 +120,7 @@ class SourcesController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-c")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             try:
                 the_item = self.commands_with_sources[ns_parser.cmd]
@@ -166,7 +170,7 @@ class SourcesController(BaseController):
             other_args.insert(0, "-c")
             if "-s" not in other_args and "--source" not in other_args:
                 other_args.insert(2, "-s")
-        ns_parser = parse_simple_args(parser, other_args)
+        ns_parser = self.parse_simple_args(parser, other_args)
         if ns_parser:
             menus = ns_parser.cmd.split("_")
             num_menus = len(menus)

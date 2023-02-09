@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 @log_start_end(log=logger)
 @check_api_key(["API_KEY_QUANDL"])
-def display_top_retail(limit: int = 3, export: str = ""):
+def display_top_retail(limit: int = 3, export: str = "", sheet_name: str = None):
     """Display the top 10 retail traded stocks for last days
 
     Parameters
@@ -43,33 +43,47 @@ def display_top_retail(limit: int = 3, export: str = ""):
             show_index=False,
             title=f"[bold]{date} Top Retail:[/bold]",
         )
+        console.print("")
 
-    export_data(export, os.path.dirname(os.path.abspath(__file__)), "rtat", retails)
+    export_data(
+        export,
+        os.path.dirname(os.path.abspath(__file__)),
+        "rtat",
+        retails,
+        sheet_name,
+    )
 
 
 @log_start_end(log=logger)
 def display_dividend_calendar(
-    date: str = datetime.today().strftime("%Y-%m-%d"),
+    date: str = None,
     sortby: str = "Dividend",
     ascend: bool = False,
     limit: int = 10,
     export: str = "",
+    sheet_name: str = None,
 ):
     """Display NASDAQ dividend calendar
 
     Parameters
     ----------
     date: str
-        Date to get dividend calendar for
+        Date to get dividend calendar for, format YYYY-MM-DD
     sortby: str
         Column to sort data for
     ascend: bool
         Flag to sort in ascending order
     limit: int
         Number of results to show
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     """
+
+    if date is None:
+        date = datetime.today().strftime("%Y-%m-%d")
+
     div_map = {
         "symbol": "Symbol",
         "companyName": "Name",
@@ -95,4 +109,10 @@ def display_dividend_calendar(
         headers=[x.title() for x in calendar.columns],
         title=f"[bold]Dividend Calendar for {date}[/bold]",
     )
-    export_data(export, os.path.dirname(os.path.abspath(__file__)), "divcal", calendar)
+    export_data(
+        export,
+        os.path.dirname(os.path.abspath(__file__)),
+        "divcal",
+        calendar,
+        sheet_name,
+    )

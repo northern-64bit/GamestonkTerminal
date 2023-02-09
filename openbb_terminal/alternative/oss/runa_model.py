@@ -9,7 +9,7 @@ from requests.adapters import HTTPAdapter, RetryError
 from urllib3.util.retry import Retry
 
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import get_user_agent
+from openbb_terminal.helper_funcs import get_user_agent, request
 from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ SORT_COLUMNS = [
 def _retry_session(
     url: str, retries: int = 3, backoff_factor: float = 1.0
 ) -> requests.Session:
-    """Helper methods that retries to make request
+    """Helper methods that retries to make request.
 
 
     Parameters
@@ -65,7 +65,7 @@ def _retry_session(
 
 @log_start_end(log=logger)
 def _make_request(url: str) -> Union[BeautifulSoup, None]:
-    """Helper method to scrap
+    """Helper method to scrap.
 
     Parameters
     ----------
@@ -74,12 +74,13 @@ def _make_request(url: str) -> Union[BeautifulSoup, None]:
 
     Returns
     -------
-        BeautifulSoup object
+    Union[BeautifulSoup, None]
+        BeautifulSoup object or None
     """
     headers = {"User-Agent": get_user_agent()}
     session = _retry_session("https://runacap.com/")
     try:
-        req = session.get(url, headers=headers, timeout=5)
+        req = session.get(url, headers=headers)
     except Exception as error:
         logger.exception(str(error))
         console.print(error)
@@ -101,17 +102,14 @@ def _make_request(url: str) -> Union[BeautifulSoup, None]:
 
 @log_start_end(log=logger)
 def get_startups() -> pd.DataFrame:
-    """Get startups from ROSS index [Source: https://runacap.com/]
-
-    Parameters
-    ----------
+    """Get startups from ROSS index [Source: https://runacap.com/].
 
     Returns
     -------
-    pandas.DataFrame:
+    pd.DataFrame
         list of startups
     """
-    response = requests.get("https://runacap.com/ross-index/", timeout=10)
+    response = request("https://runacap.com/ross-index/")
     soup = BeautifulSoup(response.content, "html.parser")
     startups = []
     if soup:

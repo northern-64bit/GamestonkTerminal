@@ -48,7 +48,7 @@ def display_whatif_scenario(
     num_shares_acquired: float
         Number of shares acquired
     """
-    data = yf.download(symbol, progress=False)
+    data = yf.download(symbol, progress=False, ignore_tz=True)
 
     if not data.empty:
         data = data["Adj Close"]
@@ -122,6 +122,7 @@ def display_simple_ema(
     spy_bt: bool = True,
     no_bench: bool = False,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
     """Strategy where stock is bought when Price > EMA(l)
@@ -149,7 +150,6 @@ def display_simple_ema(
         console.print("Backtesting on intraday data is not yet supported.")
         console.print("Submit a feature request to let us know that you need it here:")
         console.print("https://openbb.co/request-a-feature")
-        console.print("")
         return
 
     # This plot has 1 axis
@@ -171,7 +171,11 @@ def display_simple_ema(
     console.print(res.display(), "\n")
 
     export_data(
-        export, os.path.dirname(os.path.abspath(__file__)), "simple_ema", res.stats
+        export,
+        os.path.dirname(os.path.abspath(__file__)),
+        "simple_ema",
+        res.stats,
+        sheet_name,
     )
 
     return
@@ -187,6 +191,7 @@ def display_emacross(
     no_bench: bool = False,
     shortable: bool = True,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):  # pylint: disable=R0913
     """Strategy where we go long/short when EMA(short) is greater than/less than EMA(short)
@@ -218,7 +223,6 @@ def display_emacross(
         console.print("Backtesting on intraday data is not yet supported.")
         console.print("Submit a feature request to let us know that you need it here:")
         console.print("https://openbb.co/request-a-feature")
-        console.print("")
         return
 
     # This plot has 1 axis
@@ -240,7 +244,11 @@ def display_emacross(
         theme.visualize_output()
 
     export_data(
-        export, os.path.dirname(os.path.abspath(__file__)), "emacross", res.stats
+        export,
+        os.path.dirname(os.path.abspath(__file__)),
+        "emacross",
+        res.stats,
+        sheet_name,
     )
     return
 
@@ -257,6 +265,7 @@ def display_rsi_strategy(
     no_bench: bool = False,
     shortable: bool = True,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
     """Strategy that buys when the stock is less than a threshold and shorts when it exceeds a threshold.
@@ -290,7 +299,6 @@ def display_rsi_strategy(
         console.print("Backtesting on intraday data is not yet supported.")
         console.print("Submit a feature request to let us know that you need it here:")
         console.print("https://openbb.co/request-a-feature")
-        console.print("")
         return
 
     # This plot has 1 axis
@@ -313,6 +321,10 @@ def display_rsi_strategy(
         theme.visualize_output()
 
     export_data(
-        export, os.path.dirname(os.path.abspath(__file__)), "rsi_corss", res.stats
+        export,
+        os.path.dirname(os.path.abspath(__file__)),
+        "rsi_corss",
+        res.stats,
+        sheet_name,
     )
     return

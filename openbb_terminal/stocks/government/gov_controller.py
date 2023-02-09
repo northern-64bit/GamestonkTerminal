@@ -42,6 +42,7 @@ class GovController(StockBaseController):
     gov_type_choices = ["congress", "senate", "house"]
     analysis_choices = ["total", "upmom", "downmom"]
     PATH = "/stocks/gov/"
+    CHOICES_GENERATION = True
 
     def __init__(
         self,
@@ -54,58 +55,7 @@ class GovController(StockBaseController):
         self.ticker = ticker
 
         if session and obbff.USE_PROMPT_TOOLKIT:
-            choices: dict = {c: {} for c in self.controller_choices}
-
-            one_to_hundred: dict = {str(c): {} for c in range(1, 100)}
-            choices["lasttrades"] = {c: {} for c in self.gov_type_choices}
-            choices["lasttrades"]["--past_transactions_days"] = one_to_hundred
-            choices["lasttrades"]["-p"] = "--past_transactions_days"
-            choices["lasttrades"]["--representative"] = {}
-            choices["lasttrades"]["-r"] = "--representative"
-            choices["topbuys"] = {c: {} for c in self.gov_type_choices}
-            choices["topbuys"]["--past_transactions_months"] = one_to_hundred
-            choices["topbuys"]["-p"] = "--past_transactions_months"
-            choices["topbuys"]["--limit"] = one_to_hundred
-            choices["topbuys"]["-l"] = "--limit"
-            choices["topbuys"]["--raw"] = {}
-            choices["topsells"] = {c: {} for c in self.gov_type_choices}
-            choices["topsells"]["--past_transactions_months"] = one_to_hundred
-            choices["topsells"]["-p"] = "--past_transactions_months"
-            choices["topsells"]["--limit"] = one_to_hundred
-            choices["topsells"]["-l"] = "--limit"
-            choices["topsells"]["--raw"] = {}
-            choices["lastcontracts"]["--past_transactions_days"] = one_to_hundred
-            choices["lastcontracts"]["-p"] = "--past_transactions_days"
-            choices["lastcontracts"]["--limit"] = one_to_hundred
-            choices["lastcontracts"]["-l"] = "--limit"
-            choices["lastcontracts"]["--sum"] = {}
-            choices["lastcontracts"]["-s"] = "--sum"
-            choices["qtrcontracts"] = {
-                "--analysis": {c: {} for c in self.analysis_choices},
-                "-a": "--analysis",
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-                "--raw": {},
-            }
-            choices["toplobbying"] = {
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-                "--raw": {},
-            }
-            choices["gtrades"] = {c: {} for c in self.gov_type_choices}
-            choices["gtrades"]["--past_transactions_months"] = one_to_hundred
-            choices["gtrades"]["-p"] = "--past_transactions_months"
-            choices["gtrades"]["--raw"] = {}
-            choices["contracts"] = {
-                "--past_transactions_days": one_to_hundred,
-                "-p": "--past_transactions_days",
-                "--raw": {},
-            }
-            choices["histcont"]["--raw"] = {}
-            choices["lobbying"] = {
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
+            choices: dict = self.choices_default
 
             self.completer = NestedCompleter.from_nested_dict(choices)
 
@@ -182,6 +132,9 @@ class GovController(StockBaseController):
                 limit=ns_parser.past_transactions_days,
                 representative=ns_parser.representative,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -238,6 +191,9 @@ class GovController(StockBaseController):
                 limit=ns_parser.limit,
                 raw=ns_parser.raw,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -294,6 +250,9 @@ class GovController(StockBaseController):
                 limit=ns_parser.limit,
                 raw=ns_parser.raw,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -342,6 +301,9 @@ class GovController(StockBaseController):
                 limit=ns_parser.limit,
                 sum_contracts=ns_parser.sum,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -391,6 +353,9 @@ class GovController(StockBaseController):
                 limit=ns_parser.limit,
                 raw=ns_parser.raw,
                 export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -472,6 +437,9 @@ class GovController(StockBaseController):
                     past_transactions_months=ns_parser.past_transactions_months,
                     raw=ns_parser.raw,
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print("No ticker loaded. Use `load <ticker>` first.\n")
@@ -513,6 +481,9 @@ class GovController(StockBaseController):
                     past_transaction_days=ns_parser.past_transaction_days,
                     raw=ns_parser.raw,
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print("No ticker loaded. Use `load <ticker>` first.\n")

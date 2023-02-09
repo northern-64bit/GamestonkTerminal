@@ -52,8 +52,9 @@ def display_messari_timeseries_list(
     query: str = "",
     only_free: bool = True,
     export: str = "",
+    sheet_name: str = None,
 ) -> None:
-    """Display messari timeseries list
+    """Prints table showing messari timeseries list
     [Source: https://messari.io/]
 
     Parameters
@@ -94,6 +95,7 @@ def display_messari_timeseries_list(
             os.path.dirname(os.path.abspath(__file__)),
             "mt",
             df,
+            sheet_name,
         )
     else:
         console.print("\nUnable to retrieve data from Messari.\n")
@@ -104,13 +106,14 @@ def display_messari_timeseries_list(
 def display_messari_timeseries(
     symbol: str,
     timeseries_id: str,
-    start_date: str = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"),
-    end_date: str = datetime.now().strftime("%Y-%m-%d"),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     interval: str = "1d",
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
-    """Display messari timeseries
+    """Plots messari timeseries
     [Source: https://messari.io/]
 
     Parameters
@@ -119,9 +122,9 @@ def display_messari_timeseries(
         Crypto symbol to check market cap dominance
     timeseries_id: str
         Obtained by api.crypto.dd.get_mt command
-    start_date : int
+    start_date : Optional[str]
         Initial date like string (e.g., 2021-10-01)
-    end_date : int
+    end_date : Optional[str]
         End date like string (e.g., 2021-10-01)
     interval : str
         Interval frequency (possible values are: 5m, 15m, 30m, 1h, 1d, 1w)
@@ -130,6 +133,12 @@ def display_messari_timeseries(
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
+
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+
+    if end_date is None:
+        end_date = datetime.now().strftime("%Y-%m-%d")
 
     df, title = get_messari_timeseries(
         symbol=symbol,
@@ -168,6 +177,7 @@ def display_messari_timeseries(
             os.path.dirname(os.path.abspath(__file__)),
             "mt",
             df,
+            sheet_name,
         )
 
 
@@ -175,22 +185,23 @@ def display_messari_timeseries(
 @check_api_key(["API_MESSARI_KEY"])
 def display_marketcap_dominance(
     symbol: str,
-    start_date: str = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"),
-    end_date: str = datetime.now().strftime("%Y-%m-%d"),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     interval: str = "1d",
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
-    """Display market dominance of a coin over time
+    """Plots market dominance of a coin over time
     [Source: https://messari.io/]
 
     Parameters
     ----------
     symbol : str
         Crypto symbol to check market cap dominance
-    start_date : int
+    start_date : Optional[str]
         Initial date like string (e.g., 2021-10-01)
-    end_date : int
+    end_date : Optional[str]
         End date like string (e.g., 2021-10-01)
     interval : str
         Interval frequency (possible values are: 5m, 15m, 30m, 1h, 1d, 1w)
@@ -200,12 +211,17 @@ def display_marketcap_dominance(
         External axes (1 axis is expected in the list), by default None
     """
 
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+
+    if end_date is None:
+        end_date = datetime.now().strftime("%Y-%m-%d")
+
     df = get_marketcap_dominance(
         symbol=symbol, start_date=start_date, end_date=end_date, interval=interval
     )
 
     if not df.empty:
-
         # This plot has 1 axis
         if not external_axes:
             _, ax = plt.subplots(figsize=plot_autoscale(), dpi=cfgPlot.PLOT_DPI)
@@ -230,13 +246,14 @@ def display_marketcap_dominance(
             os.path.dirname(os.path.abspath(__file__)),
             "mcapdom",
             df,
+            sheet_name,
         )
 
 
 @log_start_end(log=logger)
 @check_api_key(["API_MESSARI_KEY"])
-def display_links(symbol: str, export: str = "") -> None:
-    """Display coin links
+def display_links(symbol: str, export: str = "", sheet_name: str = None) -> None:
+    """Prints table showing coin links
     [Source: https://messari.io/]
 
     Parameters
@@ -263,6 +280,7 @@ def display_links(symbol: str, export: str = "") -> None:
             os.path.dirname(os.path.abspath(__file__)),
             "links",
             df,
+            sheet_name,
         )
     else:
         console.print("\nUnable to retrieve data from Messari.\n")
@@ -275,9 +293,10 @@ def display_roadmap(
     ascend: bool = True,
     limit: int = 5,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
-    """Display coin roadmap
+    """Plots coin roadmap
     [Source: https://messari.io/]
 
     Parameters
@@ -365,6 +384,7 @@ def display_roadmap(
             os.path.dirname(os.path.abspath(__file__)),
             "rm",
             df,
+            sheet_name,
         )
     else:
         console.print("\nUnable to retrieve data from Messari.\n")
@@ -375,9 +395,10 @@ def display_roadmap(
 def display_tokenomics(
     symbol: str,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
-    """Display coin tokenomics
+    """Plots coin tokenomics
     [Source: https://messari.io/]
 
     Parameters
@@ -449,6 +470,7 @@ def display_tokenomics(
             os.path.dirname(os.path.abspath(__file__)),
             "tk",
             df,
+            sheet_name,
         )
     else:
         console.print("\nUnable to retrieve data from Messari.\n")
@@ -459,8 +481,9 @@ def display_tokenomics(
 def display_project_info(
     symbol: str,
     export: str = "",
+    sheet_name: str = None,
 ) -> None:
-    """Display project info
+    """Prints table showing project info
     [Source: https://messari.io/]
 
     Parameters
@@ -491,6 +514,7 @@ def display_project_info(
         os.path.dirname(os.path.abspath(__file__)),
         "pi",
         df_info,
+        sheet_name,
     )
 
 
@@ -499,8 +523,9 @@ def display_project_info(
 def display_investors(
     symbol: str,
     export: str = "",
+    sheet_name: str = None,
 ) -> None:
-    """Display coin investors
+    """Prints table showing coin investors
     [Source: https://messari.io/]
 
     Parameters
@@ -535,6 +560,7 @@ def display_investors(
             os.path.dirname(os.path.abspath(__file__)),
             "inv",
             df_individuals,
+            sheet_name,
         )
     else:
         console.print("\nInvestors not found\n")
@@ -545,8 +571,9 @@ def display_investors(
 def display_team(
     symbol: str,
     export: str = "",
+    sheet_name: str = None,
 ) -> None:
-    """Display coin team
+    """Prints table showing coin team
     [Source: https://messari.io/]
 
     Parameters
@@ -581,6 +608,7 @@ def display_team(
             os.path.dirname(os.path.abspath(__file__)),
             "team",
             df_individuals,
+            sheet_name,
         )
     else:
         console.print("\nTeam not found\n")
@@ -591,8 +619,9 @@ def display_team(
 def display_governance(
     symbol: str,
     export: str = "",
+    sheet_name: str = None,
 ) -> None:
-    """Display coin governance
+    """Prints table showing coin governance
     [Source: https://messari.io/]
 
     Parameters
@@ -618,6 +647,7 @@ def display_governance(
             os.path.dirname(os.path.abspath(__file__)),
             "gov",
             df,
+            sheet_name,
         )
     else:
         console.print(f"\n{symbol} governance details not found\n")
@@ -628,6 +658,7 @@ def display_governance(
 def display_fundraising(
     symbol: str,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
     """Display coin fundraising
@@ -726,4 +757,5 @@ def display_fundraising(
         os.path.dirname(os.path.abspath(__file__)),
         "fr",
         df_details,
+        sheet_name,
     )

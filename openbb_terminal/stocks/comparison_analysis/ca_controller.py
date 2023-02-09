@@ -19,6 +19,7 @@ from openbb_terminal.helper_funcs import (
     check_non_negative,
     check_positive,
     valid_date,
+    check_start_less_than_end,
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
@@ -71,6 +72,7 @@ class ComparisonAnalysisController(BaseController):
     choices_ohlca = ["o", "h", "l", "c", "a"]
     CHOICES_MENUS: List = list()
     PATH = "/stocks/ca/"
+    CHOICES_GENERATION = True
 
     def __init__(self, similar: List[str] = None, queue: List[str] = None):
         """Constructor"""
@@ -87,75 +89,15 @@ class ComparisonAnalysisController(BaseController):
             self.similar = []
 
         if session and obbff.USE_PROMPT_TOOLKIT:
-            choices: dict = {c: {} for c in self.controller_choices}
-
-            one_to_hundred: dict = {str(c): {} for c in range(1, 100)}
-            one_to_three_hundred: dict = {str(c): {} for c in range(1, 300)}
-            choices["load"] = {
-                "--ticker": None,
-                "-t": "--ticker",
-            }
-            choices["tsne"] = {
-                "--learnrate": one_to_three_hundred,
-                "-r": "--learnrate",
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-            }
-            choices["get"] = {
-                "--us_only": {},
-                "-u": "--us_only",
-                "--nocountry": {},
-                "-n": "--nocountry",
-                "--limit": one_to_hundred,
-                "-l": "--limit",
-                "--source": {
-                    c: {} for c in get_ordered_list_sources(f"{self.PATH}get")
-                },
-            }
-            complete_similar = {
-                "--similar": None,
-                "-s": "--similar",
-            }
-            choices["set"] = complete_similar
-            choices["add"] = complete_similar
-            choices["rmv"] = complete_similar
-            choices["historical"] = {
-                "--type": {c: {} for c in self.choices_ohlca},
-                "-t": "--type",
-                "--normalize": {},
-                "-n": "--normalize",
-                "--start": None,
-                "-s": "--start",
-            }
-            choices["hcorr"] = {
-                "--type": {c: {} for c in self.choices_ohlca},
-                "-t": "--type",
-                "--start": None,
-                "-s": "--start",
-                "--display-full-matrix": {},
-                "--raw": {},
-            }
-            choices["volume"] = {
-                "--start": None,
-                "-s": "--start",
-            }
-            statements: dict = {
-                "--timeframe": None,
-                "-t": "--timeframe",
-                "--quarter": {},
-                "-q": "--quarter",
-            }
-            choices["income"] = statements
-            choices["balance"] = statements
-            choices["cashflow"] = statements
-            raw = {
-                "--raw": {},
-                "-r": "--raw",
-            }
-            choices["sentiment"] = raw
-            choices["scorr"] = raw
+            choices: dict = self.choices_default
 
             self.completer = NestedCompleter.from_nested_dict(choices)
+
+    def call_exit(self, _) -> None:
+        """Process exit terminal command from forecast menu."""
+        self.save_class()
+        for _ in range(self.PATH.count("/") + 1):
+            self.queue.insert(0, "quit")
 
     def print_help(self):
         """Print help"""
@@ -230,7 +172,6 @@ class ComparisonAnalysisController(BaseController):
                     )
                 else:
                     self.ticker = ns_parser.ticker.upper()
-            console.print()
 
     @log_start_end(log=logger)
     def call_tsne(self, other_args: List[str]):
@@ -378,19 +319,20 @@ class ComparisonAnalysisController(BaseController):
                 elif ns_parser.source == "Finnhub":
                     self.similar = finnhub_model.get_similar_companies(self.ticker)
 
-                    self.user = "Finnhub"
-
-                    if self.ticker.upper() in self.similar:
-                        self.similar.remove(self.ticker.upper())
-
-                    if len(self.similar) > ns_parser.limit:
-                        random.shuffle(self.similar)
-                        self.similar = sorted(self.similar[: ns_parser.limit])
-                        console.print(
-                            f"The limit of stocks to compare are {ns_parser.limit}. The subsample will occur randomly.\n",
-                        )
-
                     if self.similar:
+                        self.user = "Finnhub"
+
+                        if self.ticker.upper() in self.similar:
+                            self.similar.remove(self.ticker.upper())
+
+                        if len(self.similar) > ns_parser.limit:
+                            random.shuffle(self.similar)
+                            self.similar = sorted(self.similar[: ns_parser.limit])
+                            console.print(
+                                f"The limit of stocks to compare are {ns_parser.limit}."
+                                " The subsample will occur randomly.\n",
+                            )
+
                         self.similar = [self.ticker] + self.similar
                         console.print(
                             f"[{self.user}] Similar Companies: {', '.join(self.similar)}",
@@ -536,7 +478,15 @@ class ComparisonAnalysisController(BaseController):
             type=valid_date,
             default=(datetime.now() - timedelta(days=366)).strftime("%Y-%m-%d"),
             dest="start",
-            help="The starting date (format YYYY-MM-DD) of the stock",
+            help="The starting date (format YYYY-MM-DD) of the stocks",
+        )
+        parser.add_argument(
+            "-e",
+            "--end",
+            type=valid_date,
+            default=(datetime.now()).strftime("%Y-%m-%d"),
+            dest="end",
+            help="The end date (format YYYY-MM-DD) of the stocks",
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-t")
@@ -545,12 +495,18 @@ class ComparisonAnalysisController(BaseController):
         )
         if ns_parser:
             if self.similar and len(self.similar) > 1:
+                if check_start_less_than_end(ns_parser.start, ns_parser.end):
+                    return
                 yahoo_finance_view.display_historical(
                     similar=self.similar,
                     start_date=ns_parser.start.strftime("%Y-%m-%d"),
+                    end_date=ns_parser.end.strftime("%Y-%m-%d"),
                     candle_type=ns_parser.type_candle,
                     normalize=ns_parser.normalize,
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
 
             else:
@@ -575,7 +531,7 @@ class ComparisonAnalysisController(BaseController):
             action="store",
             dest="type_candle",
             type=str,
-            choices=["o", "h", "l", "c", "a", "r"],
+            choices=self.choices_ohlca,
             default="a",  # in case it's adjusted close
             help="Candle data to use: o-open, h-high, l-low, c-close, a-adjusted close, r-returns.",
         )
@@ -586,6 +542,14 @@ class ComparisonAnalysisController(BaseController):
             default=(datetime.now() - timedelta(days=366)).strftime("%Y-%m-%d"),
             dest="start",
             help="The starting date (format YYYY-MM-DD) of the stock",
+        )
+        parser.add_argument(
+            "-e",
+            "--end",
+            type=valid_date,
+            default=(datetime.now()).strftime("%Y-%m-%d"),
+            dest="end",
+            help="The end date (format YYYY-MM-DD) of the stocks",
         )
         parser.add_argument(
             "--display-full-matrix",
@@ -599,11 +563,17 @@ class ComparisonAnalysisController(BaseController):
         )
         if ns_parser:
             if self.similar and len(self.similar) > 1:
+                if check_start_less_than_end(ns_parser.start, ns_parser.end):
+                    return
                 yahoo_finance_view.display_correlation(
                     similar=self.similar,
                     start_date=ns_parser.start.strftime("%Y-%m-%d"),
+                    end_date=ns_parser.end.strftime("%Y-%m-%d"),
                     candle_type=ns_parser.type_candle,
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                     display_full_matrix=ns_parser.display_full_matrix,
                     raw=ns_parser.raw,
                 )
@@ -648,6 +618,10 @@ class ComparisonAnalysisController(BaseController):
                 symbols=self.similar,
                 timeframe=ns_parser.s_timeframe,
                 quarter=ns_parser.b_quarter,
+                export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -668,6 +642,14 @@ class ComparisonAnalysisController(BaseController):
             dest="start",
             help="The starting date (format YYYY-MM-DD) of the stock",
         )
+        parser.add_argument(
+            "-e",
+            "--end",
+            type=valid_date,
+            default=(datetime.now()).strftime("%Y-%m-%d"),
+            dest="end",
+            help="The end date (format YYYY-MM-DD) of the stocks",
+        )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-s")
         ns_parser = self.parse_known_args_and_warn(
@@ -675,10 +657,16 @@ class ComparisonAnalysisController(BaseController):
         )
         if ns_parser:
             if self.similar and len(self.similar) > 1:
+                if check_start_less_than_end(ns_parser.start, ns_parser.end):
+                    return
                 yahoo_finance_view.display_volume(
                     similar=self.similar,
                     start_date=ns_parser.start.strftime("%Y-%m-%d"),
+                    end_date=ns_parser.end.strftime("%Y-%m-%d"),
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
 
             else:
@@ -720,6 +708,10 @@ class ComparisonAnalysisController(BaseController):
                 symbols=self.similar,
                 timeframe=ns_parser.s_timeframe,
                 quarter=ns_parser.b_quarter,
+                export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -759,6 +751,10 @@ class ComparisonAnalysisController(BaseController):
                 symbols=self.similar,
                 timeframe=ns_parser.s_timeframe,
                 quarter=ns_parser.b_quarter,
+                export=ns_parser.export,
+                sheet_name=" ".join(ns_parser.sheet_name)
+                if ns_parser.sheet_name
+                else None,
             )
 
     @log_start_end(log=logger)
@@ -789,6 +785,9 @@ class ComparisonAnalysisController(BaseController):
                     similar=self.similar,
                     raw=ns_parser.raw,
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print(
@@ -823,6 +822,9 @@ class ComparisonAnalysisController(BaseController):
                     similar=self.similar,
                     raw=ns_parser.raw,
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print("Please make sure there are similar tickers selected. \n")
@@ -847,6 +849,9 @@ class ComparisonAnalysisController(BaseController):
                     similar=self.similar,
                     data_type="overview",
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print(
@@ -873,6 +878,9 @@ class ComparisonAnalysisController(BaseController):
                     similar=self.similar,
                     data_type="valuation",
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print(
@@ -899,6 +907,9 @@ class ComparisonAnalysisController(BaseController):
                     similar=self.similar,
                     data_type="financial",
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print(
@@ -925,6 +936,9 @@ class ComparisonAnalysisController(BaseController):
                     similar=self.similar,
                     data_type="ownership",
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print(
@@ -951,6 +965,9 @@ class ComparisonAnalysisController(BaseController):
                     similar=self.similar,
                     data_type="performance",
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print(
@@ -977,6 +994,9 @@ class ComparisonAnalysisController(BaseController):
                     similar=self.similar,
                     data_type="technical",
                     export=ns_parser.export,
+                    sheet_name=" ".join(ns_parser.sheet_name)
+                    if ns_parser.sheet_name
+                    else None,
                 )
             else:
                 console.print(

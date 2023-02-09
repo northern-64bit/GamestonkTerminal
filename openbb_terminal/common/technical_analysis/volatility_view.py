@@ -22,6 +22,8 @@ from openbb_terminal.common.technical_analysis import ta_helpers
 
 logger = logging.getLogger(__name__)
 
+# pylint: disable=too-many-arguments
+
 
 @log_start_end(log=logger)
 def display_bbands(
@@ -31,9 +33,10 @@ def display_bbands(
     n_std: float = 2,
     mamode: str = "sma",
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """Show bollinger bands
+    """Plots bollinger bands
 
     Parameters
     ----------
@@ -105,6 +108,7 @@ def display_bbands(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "bbands",
         df_ta,
+        sheet_name,
     )
 
 
@@ -115,9 +119,10 @@ def display_donchian(
     upper_length: int = 20,
     lower_length: int = 20,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """Show donchian channels
+    """Plots donchian channels
 
     Parameters
     ----------
@@ -187,6 +192,7 @@ def display_donchian(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "donchian",
         df_ta,
+        sheet_name,
     )
 
 
@@ -199,9 +205,10 @@ def view_kc(
     offset: int = 0,
     symbol: str = "",
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """View Keltner Channels Indicator
+    """Plots Keltner Channels Indicator
 
     Parameters
     ----------
@@ -218,6 +225,8 @@ def view_kc(
         Offset value
     symbol: str
         Ticker symbol
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     external_axes: Optional[List[plt.Axes]], optional
@@ -282,6 +291,7 @@ def view_kc(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "kc",
         df_ta,
+        sheet_name,
     )
 
 
@@ -293,9 +303,10 @@ def display_atr(
     mamode: str = "sma",
     offset: int = 0,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
-    """Show ATR
+    """Plots ATR
 
     Parameters
     ----------
@@ -354,4 +365,5 @@ def display_atr(
         os.path.dirname(os.path.abspath(__file__)).replace("common", "stocks"),
         "atr",
         df_ta,
+        sheet_name,
     )

@@ -5,15 +5,15 @@ import argparse
 import io
 import logging
 from pathlib import Path
-from typing import List, Union, Optional, Dict
+from typing import List, Union, Optional, Dict, Tuple
 from functools import lru_cache
 from datetime import datetime, timedelta
 from datetime import date as d
 import types
 from collections.abc import Iterable
 import os
-import random
 import re
+import random
 import sys
 from difflib import SequenceMatcher
 import webbrowser
@@ -40,11 +40,13 @@ from PIL import Image, ImageDraw
 
 from openbb_terminal.rich_config import console
 from openbb_terminal import feature_flags as obbff
+from openbb_terminal import config_terminal as cfg
 from openbb_terminal import config_plot as cfgPlot
 from openbb_terminal.core.config.paths import (
     HOME_DIRECTORY,
     USER_ENV_FILE,
     USER_EXPORTS_DIRECTORY,
+    load_dotenv_with_priority,
 )
 from openbb_terminal.core.config import paths
 
@@ -65,6 +67,9 @@ MENU_RESET = 2
 
 # Command location path to be shown in the figures depending on watermark flag
 command_location = ""
+
+
+# pylint: disable=R0912
 
 
 # pylint: disable=global-statement
@@ -147,8 +152,6 @@ def parse_and_split_input(an_input: str, custom_filters: List) -> List[str]:
     if an_input:
         if an_input == "/":
             an_input = "home"
-        elif an_input[0] == "/":
-            an_input = "home" + an_input
 
     # everything from ` -f ` to the next known extension
     file_flag = r"(\ -f |\ --file )"
@@ -218,6 +221,37 @@ def similar(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
+def return_colored_value(value: str):
+    """Return the string value with green, yellow, red or white color based on
+    whether the number is positive, negative, zero or other, respectively.
+
+    Parameters
+    ----------
+    value: str
+        string to be checked
+
+    Returns
+    -------
+    value: str
+        string with color based on value of number if it exists
+    """
+    values = re.findall(r"[-+]?(?:\d*\.\d+|\d+)", value)
+
+    # Finds exactly 1 number in the string
+    if len(values) == 1:
+        if float(values[0]) > 0:
+            return f"[green]{value}[/green]"
+
+        if float(values[0]) < 0:
+            return f"[red]{value}[/red]"
+
+        if float(values[0]) == 0:
+            return f"[yellow]{value}[/yellow]"
+
+    return f"{value}"
+
+
+# pylint: disable=too-many-arguments
 def print_rich_table(
     df: pd.DataFrame,
     show_index: bool = False,
@@ -226,6 +260,9 @@ def print_rich_table(
     headers: Union[List[str], pd.Index] = None,
     floatfmt: Union[str, List[str]] = ".2f",
     show_header: bool = True,
+    automatic_coloring: bool = False,
+    columns_to_auto_color: List[str] = None,
+    rows_to_auto_color: List[str] = None,
 ):
     """Prepare a table from df in rich.
 
@@ -245,9 +282,32 @@ def print_rich_table(
         Float number formatting specs as string or list of strings. Defaults to ".2f"
     show_header: bool
         Whether to show the header row.
+    automatic_coloring: bool
+        Automatically color a table based on positive and negative values
+    columns_to_auto_color: List[str]
+        Columns to automatically color
+    rows_to_auto_color: List[str]
+        Rows to automatically color
     """
     if obbff.USE_TABULATE_DF:
         table = Table(title=title, show_lines=True, show_header=show_header)
+
+        if obbff.USE_COLOR and automatic_coloring:
+            if columns_to_auto_color:
+                for col in columns_to_auto_color:
+                    # checks whether column exists
+                    if col in df.columns:
+                        df[col] = df[col].apply(lambda x: return_colored_value(str(x)))
+            if rows_to_auto_color:
+                for row in rows_to_auto_color:
+                    # checks whether row exists
+                    if row in df.index:
+                        df.loc[row] = df.loc[row].apply(
+                            lambda x: return_colored_value(str(x))
+                        )
+
+            if columns_to_auto_color is None and rows_to_auto_color is None:
+                df = df.applymap(lambda x: return_colored_value(str(x)))
 
         if show_index:
             table.add_column(index_name)
@@ -277,8 +337,8 @@ def print_rich_table(
 
         for idx, values in zip(df.index.tolist(), df.values.tolist()):
             # remove hour/min/sec from timestamp index - Format: YYYY-MM-DD # make better
-            row = [str(idx)] if show_index else []
-            row += [
+            row_idx = [str(idx)] if show_index else []
+            row_idx += [
                 str(x)
                 if not isinstance(x, float) and not isinstance(x, np.float64)
                 else (
@@ -290,9 +350,26 @@ def print_rich_table(
                 )
                 for idx, x in enumerate(values)
             ]
-            table.add_row(*row)
+            table.add_row(*row_idx)
         console.print(table)
     else:
+        if obbff.USE_COLOR and automatic_coloring:
+            if columns_to_auto_color:
+                for col in columns_to_auto_color:
+                    # checks whether column exists
+                    if col in df.columns:
+                        df[col] = df[col].apply(lambda x: return_colored_value(str(x)))
+            if rows_to_auto_color:
+                for row in rows_to_auto_color:
+                    # checks whether row exists
+                    if row in df.index:
+                        df.loc[row] = df.loc[row].apply(
+                            lambda x: return_colored_value(str(x))
+                        )
+
+            if columns_to_auto_color is None and rows_to_auto_color is None:
+                df = df.applymap(lambda x: return_colored_value(str(x)))
+
         console.print(df.to_string(col_space=0))
 
 
@@ -311,6 +388,7 @@ def check_int_range(mini: int, maxi: int):
     int_range_checker:
         Function that compares the three integers
     """
+
     # Define the function with default arguments
     def int_range_checker(num: int) -> int:
         """Check if int is between a high and low value.
@@ -321,7 +399,7 @@ def check_int_range(mini: int, maxi: int):
             Input integer
 
         Returns
-        -------
+        ----------
         num: int
             Input number if conditions are met
 
@@ -453,7 +531,7 @@ def check_proportion_range(num) -> float:
     num: float
         Input number if conditions are met
     Raises
-    -------
+    ----------
     argparse.ArgumentTypeError
         Input number not between min and max values
     """
@@ -614,7 +692,6 @@ def plot_view_stock(df: pd.DataFrame, symbol: str, interval: str):
     plt.setp(ax[1].get_xticklabels(), rotation=20, horizontalalignment="right")
 
     plt.show()
-    console.print("")
 
 
 def us_market_holidays(years) -> list:
@@ -967,46 +1044,6 @@ def patch_pandas_text_adjustment():
     pandas.io.formats.format.TextAdjustment.adjoin = text_adjustment_adjoin
 
 
-def parse_simple_args(parser: argparse.ArgumentParser, other_args: List[str]):
-    """Parse list of arguments into the supplied parser.
-
-    Parameters
-    ----------
-    parser: argparse.ArgumentParser
-        Parser with predefined arguments
-    other_args: List[str]
-        List of arguments to parse
-
-    Returns
-    -------
-    ns_parser:
-        Namespace with parsed arguments
-    """
-    parser.add_argument(
-        "-h", "--help", action="store_true", help="show this help message"
-    )
-
-    if obbff.USE_CLEAR_AFTER_CMD:
-        system_clear()
-
-    try:
-        (ns_parser, l_unknown_args) = parser.parse_known_args(other_args)
-    except SystemExit:
-        # In case the command has required argument that isn't specified
-        console.print("")
-        return None
-
-    if ns_parser.help:
-        txt_help = parser.format_help()
-        console.print(f"[help]{txt_help}[/help]")
-        return None
-
-    if l_unknown_args:
-        console.print(f"The following args couldn't be interpreted: {l_unknown_args}")
-
-    return ns_parser
-
-
 def lambda_financials_colored_values(val: str) -> str:
     """Add a color to a value."""
     if val == "N/A" or str(val) == "nan":
@@ -1029,7 +1066,7 @@ def check_ohlc(type_ohlc: str) -> str:
 def lett_to_num(word: str) -> str:
     """Match ohlca to integers."""
     replacements = [("o", "1"), ("h", "2"), ("l", "3"), ("c", "4"), ("a", "5")]
-    for (a, b) in replacements:
+    for a, b in replacements:
         word = word.replace(a, b)
     return word
 
@@ -1085,7 +1122,7 @@ def get_flair() -> str:
 
 def set_default_timezone() -> None:
     """Set a default (America/New_York) timezone if one doesn't exist."""
-    dotenv.load_dotenv(USER_ENV_FILE)
+    load_dotenv_with_priority()
     user_tz = os.getenv("OPENBB_TIMEZONE")
     if not user_tz:
         dotenv.set_key(USER_ENV_FILE, "OPENBB_TIMEZONE", "America/New_York")
@@ -1115,7 +1152,7 @@ def get_user_timezone() -> str:
     str
         user timezone based on .env file
     """
-    dotenv.load_dotenv(USER_ENV_FILE)
+    load_dotenv_with_priority()
     user_tz = os.getenv("OPENBB_TIMEZONE")
     if user_tz:
         return user_tz
@@ -1231,7 +1268,7 @@ def check_file_type_saved(valid_types: List[str] = None):
             filenames to be saved separated with comma
 
         Returns
-        -------
+        ----------
         str
             valid filenames separated with comma
         """
@@ -1243,7 +1280,8 @@ def check_file_type_saved(valid_types: List[str] = None):
                 valid_filenames.append(filename)
             else:
                 console.print(
-                    f"[red]Filename '{filename}' provided is not valid![/red]"
+                    f"[red]Filename '{filename}' provided is not valid!\nPlease use one of the following file types:"
+                    f"{','.join(valid_types)}[/red]\n"
                 )
         return ",".join(valid_filenames)
 
@@ -1284,8 +1322,34 @@ def compose_export_path(func_name: str, dir_path: str) -> Path:
     return full_path
 
 
+def ask_file_overwrite(file_path: str) -> Tuple[bool, bool]:
+    """Helper to provide a prompt for overwriting existing files.
+
+    Returns two values, the first is a boolean indicating if the file exists and the
+    second is a boolean indicating if the user wants to overwrite the file.
+    """
+    # Jeroen asked for a flag to overwrite no matter what
+    if obbff.FILE_OVERWITE:
+        return False, True
+    if os.path.exists(file_path):
+        overwrite = input("\nFile already exists. Overwrite? [y/n]: ").lower()
+        if overwrite == "y":
+            # File exists and user wants to overwrite
+            return True, True
+        # File exists and user does not want to overwrite
+        return True, False
+    # File does not exist
+    return False, True
+
+
+# This is a false positive on pylint and being tracked in pylint #3060
+# pylint: disable=abstract-class-instantiated
 def export_data(
-    export_type: str, dir_path: str, func_name: str, df: pd.DataFrame = pd.DataFrame()
+    export_type: str,
+    dir_path: str,
+    func_name: str,
+    df: pd.DataFrame = pd.DataFrame(),
+    sheet_name: str = None,
 ) -> None:
     """Export data to a file.
 
@@ -1299,6 +1363,8 @@ def export_data(
         Name of the command that invokes this function
     df : pd.Dataframe
         Dataframe of data to save
+    sheet_name : str
+        If provided.  The name of the sheet to save in excel file
     """
     if export_type:
         export_path = compose_export_path(func_name, dir_path)
@@ -1311,28 +1377,89 @@ def export_data(
                 saved_path = os.path.join(export_folder, exp_type)
             # In this scenario we use the default filename
             else:
+                if ".OpenBB_openbb_terminal" in export_filename:
+                    export_filename = export_filename.replace(
+                        ".OpenBB_openbb_terminal", "OpenBBTerminal"
+                    )
                 saved_path = os.path.join(
                     export_folder, f"{export_filename}.{exp_type}"
                 )
 
+            df = df.replace(
+                {
+                    r"\[yellow\]": "",
+                    r"\[/yellow\]": "",
+                    r"\[green\]": "",
+                    r"\[/green\]": "",
+                    r"\[red\]": "",
+                    r"\[/red\]": "",
+                    r"\[magenta\]": "",
+                    r"\[/magenta\]": "",
+                },
+                regex=True,
+            )
+
             if exp_type.endswith("csv"):
+                exists, overwrite = ask_file_overwrite(saved_path)
+                if exists and not overwrite:
+                    return
                 df.to_csv(saved_path)
             elif exp_type.endswith("json"):
+                exists, overwrite = ask_file_overwrite(saved_path)
+                if exists and not overwrite:
+                    return
+                df.reset_index(drop=True, inplace=True)
                 df.to_json(saved_path)
             elif exp_type.endswith("xlsx"):
-                df.to_excel(saved_path, index=True, header=True)
+                if sheet_name is None:
+                    exists, overwrite = ask_file_overwrite(saved_path)
+                    if exists and not overwrite:
+                        return
+                    df.to_excel(saved_path, index=True, header=True)
+
+                else:
+                    if os.path.exists(saved_path):
+                        with pd.ExcelWriter(
+                            saved_path,
+                            mode="a",
+                            if_sheet_exists="new",
+                            engine="openpyxl",
+                        ) as writer:
+                            df.to_excel(
+                                writer, sheet_name=sheet_name, index=True, header=True
+                            )
+                    else:
+                        with pd.ExcelWriter(
+                            saved_path,
+                            engine="openpyxl",
+                        ) as writer:
+                            df.to_excel(
+                                writer, sheet_name=sheet_name, index=True, header=True
+                            )
             elif exp_type.endswith("png"):
+                exists, overwrite = ask_file_overwrite(saved_path)
+                if exists and not overwrite:
+                    return
                 plt.savefig(saved_path)
             elif exp_type.endswith("jpg"):
+                exists, overwrite = ask_file_overwrite(saved_path)
+                if exists and not overwrite:
+                    return
                 plt.savefig(saved_path)
             elif exp_type.endswith("pdf"):
+                exists, overwrite = ask_file_overwrite(saved_path)
+                if exists and not overwrite:
+                    return
                 plt.savefig(saved_path)
             elif exp_type.endswith("svg"):
+                exists, overwrite = ask_file_overwrite(saved_path)
+                if exists and not overwrite:
+                    return
                 plt.savefig(saved_path)
             else:
-                console.print("Wrong export file specified.")
+                console.print("\nWrong export file specified.")
 
-            console.print(f"Saved file: {saved_path}")
+            console.print(f"\nSaved file: {saved_path}")
 
 
 def get_rf() -> float:
@@ -1347,7 +1474,7 @@ def get_rf() -> float:
         base = "https://api.fiscaldata.treasury.gov/services/api/fiscal_service"
         end = "/v2/accounting/od/avg_interest_rates"
         filters = "?filter=security_desc:eq:Treasury Bills&sort=-record_date"
-        response = requests.get(base + end + filters)
+        response = request(base + end + filters)
         latest = response.json()["data"][0]
         return round(float(latest["avg_interest_rate_amt"]) / 100, 8)
     except Exception:
@@ -1583,6 +1710,7 @@ def check_list_values(valid_values: List[str]):
     check_list_values_from_valid_values_list:
         Function that ensures that the valid values go through and notifies user when value is not valid.
     """
+
     # Define the function with default arguments
     def check_list_values_from_valid_values_list(given_values: str) -> List[str]:
         """Check if argparse argument is an str format.
@@ -1671,7 +1799,6 @@ def screenshot() -> None:
             plt.savefig(img_buf, format="png")
             shot = Image.open(img_buf)
             screenshot_to_canvas(shot, plot_exists=True)
-            console.print("")
 
         else:
             console.print("No plots found.\n")
@@ -1803,3 +1930,86 @@ def list_from_str(value: str) -> List[str]:
     if value:
         return value.split(",")
     return []
+
+
+def str_date_to_timestamp(date: str) -> int:
+    """Transform string date to timestamp
+
+    Parameters
+    ----------
+    start_date : str
+        Initial date, format YYYY-MM-DD
+
+    Returns
+    -------
+    date_ts : int
+        Initial date timestamp (e.g., 1_614_556_800)
+    """
+
+    date_ts = int(
+        datetime.strptime(date + " 00:00:00+0000", "%Y-%m-%d %H:%M:%S%z").timestamp()
+    )
+
+    return date_ts
+
+
+def check_start_less_than_end(start_date: str, end_date: str) -> bool:
+    """Check if start_date is equal to end_date.
+
+    Parameters
+    ----------
+    start_date : str
+        Initial date, format YYYY-MM-DD
+    end_date : str
+        Final date, format YYYY-MM-DD
+
+    Returns
+    -------
+    bool
+        True if start_date is not equal to end_date, False otherwise
+    """
+    if start_date is None or end_date is None:
+        return False
+    if start_date == end_date:
+        console.print("[red]Start date and end date cannot be the same.[/red]")
+        return True
+    if start_date > end_date:
+        console.print("[red]Start date cannot be greater than end date.[/red]")
+        return True
+    return False
+
+
+# Write an abstract helper to make requests from a url with potential headers and params
+def request(url: str, method="GET", **kwargs) -> requests.Response:
+    """Abstract helper to make requests from a url with potential headers and params.
+
+    Parameters
+    ----------
+    url : str
+       Url to make the request to
+    method : str, optional
+       HTTP method to use.  Can be "GET" or "POST", by default "GET"
+
+    Returns
+    -------
+    requests.Response
+        Request response object
+
+    Raises
+    ------
+    ValueError
+        If invalid method is passed
+    """
+    # We want to add a user agent to the request, so check if there are any headers
+    # If there are headers, check if there is a user agent, if not add one.
+    # Some requests seem to work only with a specific user agent, so we want to be able to override it.
+    headers = kwargs.pop("headers") if "headers" in kwargs else {}
+    if "User-Agent" not in headers:
+        headers["User-Agent"] = get_user_agent()
+    if method.upper() == "GET":
+        return requests.get(url, headers=headers, timeout=cfg.REQUEST_TIMEOUT, **kwargs)
+    if method.upper() == "POST":
+        return requests.post(
+            url, headers=headers, timeout=cfg.REQUEST_TIMEOUT, **kwargs
+        )
+    raise ValueError("Method must be GET or POST")

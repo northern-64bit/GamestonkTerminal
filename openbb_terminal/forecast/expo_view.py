@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from openbb_terminal.forecast import expo_model
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.forecast import helpers
+from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
 # pylint: disable=too-many-arguments
@@ -29,6 +30,7 @@ def display_expo_forecast(
     start_window: float = 0.85,
     forecast_horizon: int = 5,
     export: str = "",
+    sheet_name: str = None,
     residuals: bool = False,
     forecast_only: bool = False,
     start_date: Optional[datetime] = None,
@@ -43,9 +45,9 @@ def display_expo_forecast(
     ----------
     data : Union[pd.Series, np.array]
         Data to forecast
-    dataset_name str
+    dataset_name: str
         The name of the ticker to be predicted
-    target_column (str, optional):
+    target_column: Optional[str]:
         Target column to forecast. Defaults to "close".
     trend: str
         Trend component.  One of [N, A, M]
@@ -64,6 +66,8 @@ def display_expo_forecast(
         Size of sliding window from start of timeseries and onwards
     forecast_horizon: int
         Number of days to forecast when backtesting and retraining historical
+    sheet_name: str
+        Optionally specify the name of the sheet the data is exported to.
     export: str
         Format to export data
     residuals: bool
@@ -77,7 +81,7 @@ def display_expo_forecast(
     naive: bool
         Whether to show the naive baseline. This just assumes the closing price will be the same
         as the previous day's closing price. Defaults to False.
-    external_axes:Optional[List[plt.axes]]
+    external_axes: Optional[List[plt.axes]]
         External axes to plot on
     """
     data = helpers.clean_data(data, start_date, end_date, target_column, None)
@@ -120,12 +124,14 @@ def display_expo_forecast(
         precision=precision,
         probabilistic=probabilistic,
         export=export,
+        sheet_name=sheet_name,
         forecast_only=forecast_only,
         naive=naive,
         export_pred_raw=export_pred_raw,
         external_axes=external_axes,
     )
     if residuals:
-        helpers.plot_residuals(
-            _model, None, ticker_series, forecast_horizon=forecast_horizon
-        )
+        console.print("[red]Expo model does not support residuals at this time[/red]\n")
+        # helpers.plot_residuals(
+        #     _model, None, ticker_series, forecast_horizon=forecast_horizon
+        # )

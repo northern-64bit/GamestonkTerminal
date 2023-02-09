@@ -18,6 +18,8 @@ from openbb_terminal.helper_funcs import (
     lambda_long_number_format,
     plot_autoscale,
     is_valid_axes_count,
+    str_date_to_timestamp,
+    print_rich_table,
 )
 
 logger = logging.getLogger(__name__)
@@ -25,29 +27,37 @@ logger = logging.getLogger(__name__)
 
 @log_start_end(log=logger)
 def display_btc_circulating_supply(
-    start_date: int = int(datetime(2010, 1, 1).timestamp()),
-    end_date: int = int(datetime.now().timestamp()),
+    start_date: str = "2010-01-01",
+    end_date: Optional[str] = None,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
     """Returns BTC circulating supply [Source: https://api.blockchain.info/]
 
     Parameters
     ----------
-    start_date : int
-        Initial date timestamp (e.g., 1_609_459_200)
-    until : int
-        End date timestamp (e.g., 1_641_588_030)
+    start_date : str
+        Initial date, format YYYY-MM-DD
+    end_date : Optional[str]
+        Final date, format YYYY-MM-DD
     export : str
         Export dataframe data to csv,json,xlsx file
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
 
+    if end_date is None:
+        end_date = datetime.now().strftime("%Y-%m-%d")
+
     df = blockchain_model.get_btc_circulating_supply()
+
+    ts_start_date = str_date_to_timestamp(start_date)
+    ts_end_date = str_date_to_timestamp(end_date)
+
     df = df[
-        (df["x"] > datetime.fromtimestamp(start_date))
-        & (df["x"] < datetime.fromtimestamp(end_date))
+        (df["x"] > datetime.fromtimestamp(ts_start_date))
+        & (df["x"] < datetime.fromtimestamp(ts_end_date))
     ]
 
     # This plot has 1 axis
@@ -73,34 +83,43 @@ def display_btc_circulating_supply(
         os.path.dirname(os.path.abspath(__file__)),
         "btccp",
         df,
+        sheet_name,
     )
 
 
 @log_start_end(log=logger)
 def display_btc_confirmed_transactions(
-    start_date: int = int(datetime(2010, 1, 1).timestamp()),
-    end_date: int = int(datetime.now().timestamp()),
+    start_date: str = "2010-01-01",
+    end_date: Optional[str] = None,
     export: str = "",
+    sheet_name: str = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
     """Returns BTC confirmed transactions [Source: https://api.blockchain.info/]
 
     Parameters
     ----------
-    since : int
-        Initial date timestamp (e.g., 1_609_459_200)
-    until : int
-        End date timestamp (e.g., 1_641_588_030)
+    start_date : str
+        Initial date, format YYYY-MM-DD
+    end_date : Optional[str]
+        Final date, format YYYY-MM-DD
     export : str
         Export dataframe data to csv,json,xlsx file
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
 
+    if end_date is None:
+        end_date = datetime.now().strftime("%Y-%m-%d")
+
     df = blockchain_model.get_btc_confirmed_transactions()
+
+    ts_start_date = str_date_to_timestamp(start_date)
+    ts_end_date = str_date_to_timestamp(end_date)
+
     df = df[
-        (df["x"] > datetime.fromtimestamp(start_date))
-        & (df["x"] < datetime.fromtimestamp(end_date))
+        (df["x"] > datetime.fromtimestamp(ts_start_date))
+        & (df["x"] < datetime.fromtimestamp(ts_end_date))
     ]
 
     # This plot has 1 axis
@@ -128,4 +147,62 @@ def display_btc_confirmed_transactions(
         os.path.dirname(os.path.abspath(__file__)),
         "btcct",
         df,
+        sheet_name,
     )
+
+
+@log_start_end(log=logger)
+def display_btc_single_block(
+    blockhash: str,
+    export: str = "",
+    sheet_name: str = None,
+) -> None:
+    """Returns BTC block data. [Source: https://api.blockchain.info/]
+    Parameters
+    ----------
+    blockhash : str
+        Hash of the block you are looking for.
+    export : str
+        Export dataframe data to csv,json,xlsx file
+    """
+
+    df = blockchain_model.get_btc_single_block(blockhash)
+    if not df.empty:
+        df.rename(index={0: "Value"}, inplace=True)
+        df_data = df.copy()
+
+        df_essentials = df[
+            [
+                "hash",
+                "ver",
+                "prev_block",
+                "mrkl_root",
+                "bits",
+                "next_block",
+                "fee",
+                "nonce",
+                "n_tx",
+                "size",
+                "block_index",
+                "main_chain",
+                "height",
+                "weight",
+            ]
+        ]
+
+        df_flipped = df_essentials.transpose()
+
+        print_rich_table(
+            df_flipped,
+            show_index=True,
+            index_name="Metric",
+            title=f"Block {int(df['height'])}",
+        )
+
+        export_data(
+            export,
+            os.path.dirname(os.path.abspath(__file__)),
+            "btcblockdata",
+            df_data,
+            sheet_name,
+        )
