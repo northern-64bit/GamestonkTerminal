@@ -28,6 +28,7 @@ from openbb_terminal.helper_funcs import (
     EXPORT_ONLY_FIGURES_ALLOWED,
     EXPORT_ONLY_RAW_DATA_ALLOWED,
     check_positive,
+    check_positive_float,
     check_positive_list,
     valid_date,
 )
@@ -1120,7 +1121,7 @@ class TechnicalAnalysisController(StockBaseController):
             "--std",
             action="store",
             dest="n_std",
-            type=check_positive,
+            type=check_positive_float,
             default=2,
             help="std",
         )

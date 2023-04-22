@@ -484,7 +484,7 @@ def check_positive(value) -> int:
 
 
 def check_positive_float(value) -> float:
-    """Argparse type to check positive int."""
+    """Argparse type to check positive float."""
     new_value = float(value)
     if new_value <= 0:
         log_and_raise(
