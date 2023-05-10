@@ -1,10 +1,13 @@
-from inspect import getmembers, isfunction
-from typing import List, Callable, Tuple
-from datetime import datetime
 import importlib.util
-from pathlib import Path
 import os
+from datetime import datetime
+from inspect import getmembers, isfunction
+from pathlib import Path
+from typing import Callable, List, Tuple
+
 import pandas as pd
+
+from openbb_terminal.core.config.paths import MAP_PATH
 
 try:
     import darts  # pylint: disable=W0611 # noqa: F401
@@ -58,14 +61,13 @@ def all_view_models() -> List[Path]:
     all_files = os.walk(base_path)
     for root, _, files in all_files:
         for filename in files:
-            if filename.endswith(".py"):
-                if "view" in filename or "model" in filename:
-                    file_list.append(f"{root}/{filename}")
+            if filename.endswith(".py") and ("view" in filename or "model" in filename):
+                file_list.append(f"{root}/{filename}")
     clean_list = set(file_list)
     return [Path(x) for x in clean_list]
 
 
-def get_sdk(file_path: str = "miscellaneous/library/trail_map.csv") -> pd.DataFrame:
+def get_sdk(file_path: Path = MAP_PATH) -> pd.DataFrame:
     """Reads the CSV that generates the sdk and converts it to a dataframe
 
     Parameters

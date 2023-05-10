@@ -1,12 +1,26 @@
 # This is for helpers that do NOT import any OpenBB Modules
-from typing import Callable, Any, Literal
+import logging
 import os
+from typing import Any, List, Literal, Optional
 
+from dotenv import load_dotenv
+from posthog import Posthog
 from rich.console import Console
+
+from openbb_terminal.core.config.paths import (
+    PACKAGE_ENV_FILE,
+    REPOSITORY_ENV_FILE,
+    SETTINGS_ENV_FILE,
+)
 
 console = Console()
 
 menus = Literal["", "featflags", "settings"]
+
+openbb_posthog = Posthog(
+    "phc_vhssDAMod5qIplznQ75Kdgz4aB1qPFmeVmfEOZ4hkRw",
+    host="https://app.posthog.com",
+)
 
 
 def handle_error(name: str, default: Any, menu: menus = ""):
@@ -36,39 +50,6 @@ def handle_error(name: str, default: Any, menu: menus = ""):
     return default
 
 
-def load_env_vars(
-    name: str, converter: Callable, default: Any, menu: menus = ""
-) -> Any:
-    """Loads an environment variable and attempts to convert it to the correct data type.
-    Will return the provided default if it fails
-
-    Parameters
-    ----------
-    name: str
-        The name of the environment variable
-    converter: Callable
-        The function to convert the env variable to the desired format
-    default: Any
-        The value to return if the converter fails
-    menu: menus
-        If provided, will tell the user where to fix the setting
-
-    Returns
-    ----------
-    Any
-        The value or the default
-    """
-    raw_var = os.getenv(name, str(default))
-    try:
-        return converter(raw_var)
-    except ValueError:
-        return handle_error(name, default, menu)
-    except AttributeError:
-        return handle_error(name, default, menu)
-    except TypeError:
-        return handle_error(name, default, menu)
-
-
 def strtobool(val):
     """Convert a string representation of truth to true (1) or false (0).
 
@@ -78,10 +59,44 @@ def strtobool(val):
     """
     val = str(val).lower()
     if val in ("y", "yes", "t", "true", "on", "1"):
-        output = 1
+        output = True
     elif val in ("n", "no", "f", "false", "off", "0"):
-        output = 0
+        output = False
     else:
         raise ValueError(f"invalid truth value {val}")
 
     return output
+
+
+def load_env_files():
+    """
+    Loads the dotenv files in the following order:
+    1. Repository .env file
+    2. Package .env file
+    3. User .env file
+
+    This allows the user to override the package settings with their own
+    settings, and the package to override the repository settings.
+
+    openbb_terminal modules are reloaded to refresh config files with new env,
+    otherwise they will use cache with old variables.
+    """
+    load_dotenv(REPOSITORY_ENV_FILE, override=True)
+    load_dotenv(PACKAGE_ENV_FILE, override=True)
+    load_dotenv(SETTINGS_ENV_FILE, override=True)
+
+
+def remove_log_handlers():
+    """Remove the log handlers - needs to be done before reloading modules."""
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
+
+def clear_openbb_env_vars(exceptions: Optional[List[str]] = None):
+    """Clear openbb environment variables."""
+    for v in os.environ:
+        if v.startswith("OPENBB"):
+            if not exceptions:
+                os.environ.pop(v)
+            elif v not in exceptions:
+                os.environ.pop(v)

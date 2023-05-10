@@ -1,3 +1,4 @@
+    filings            the most-recent form submissions to the SEC                     [FinancialModelingPrep]
     pipo               past IPOs dates                                                 [Finnhub]
     fipo               future IPOs dates                                               [Finnhub]
     gainers            show latest top gainers                                         [YahooFinance]
@@ -10,7 +11,6 @@
     arkord             orders by ARK Investment Management LLC                         [CathiesArk]
     upcoming           upcoming earnings release dates                                 [SeekingAlpha]
     trending           trending news                                                   [SeekingAlpha]
-    cnews              customized news (buybacks, ipos, spacs, healthcare, politics)   [SeekingAlpha]
     lowfloat           low float stocks under 10M shares float                         [Fidelity]
     hotpenny           today's hot penny stocks                                        [YahooFinance, Shortinterest]
     rtat               top 10 retail traded stocks per day                             [Nasdaq]

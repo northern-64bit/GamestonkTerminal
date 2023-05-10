@@ -1,4 +1,5 @@
-# IMPORTATION STANDARD
+# IMPORTS STANDARD
+
 import json
 import os
 import pathlib
@@ -6,21 +7,28 @@ from typing import Any, Dict, List, Optional, Type
 
 import importlib_metadata
 
-# IMPORTATION THIRDPARTY
+# IMPORTS THIRD-PARTY
 import matplotlib
 import pandas as pd
 import pytest
+import yfinance.utils
 from _pytest.capture import MultiCapture, SysCapture
 from _pytest.config import Config
 from _pytest.config.argparsing import Parser
 from _pytest.fixtures import SubRequest
 from _pytest.mark.structures import Mark
 
-# IMPORTATION INTERNAL
-from openbb_terminal import decorators, feature_flags as obbff, helper_funcs
-from openbb_terminal.base_helpers import strtobool
+# IMPORTS INTERNAL
+from openbb_terminal import (
+    config_terminal,
+    decorators,
+    helper_funcs,
+)
+from openbb_terminal.core.session.current_system import set_system_variable
 
 # pylint: disable=redefined-outer-name
+
+config_terminal.setup_i18n()
 
 DISPLAY_LIMIT: int = 500
 EXTENSIONS_ALLOWED: List[str] = ["csv", "json", "txt"]
@@ -30,8 +38,7 @@ EXTENSIONS_MATCHING: Dict[str, List[Type]] = {
     "txt": [str],
 }
 
-os.environ["TEST_MODE"] = "True"
-obbff.ENABLE_EXIT_AUTO_HELP = strtobool("True")
+set_system_variable("TEST_MODE", True)
 
 
 class Record:
@@ -308,14 +315,19 @@ def record_stdout_format_kwargs(
 
 def pytest_addoption(parser: Parser):
     parser.addoption(
-        "--prediction",
+        "--forecast",
         action="store_true",
-        help="To run tests with the marker : @pytest.mark.prediction",
+        help="To run tests with the marker : @pytest.mark.forecast",
     )
     parser.addoption(
         "--optimization",
         action="store_true",
         help="To run tests with the marker : @pytest.mark.optimization",
+    )
+    parser.addoption(
+        "--session",
+        action="store_true",
+        help="To run tests with the marker : @pytest.mark.session",
     )
     parser.addoption(
         "--rewrite-expected",
@@ -353,7 +365,7 @@ def disable_check_api():
 
 
 def enable_debug():
-    os.environ["DEBUG_MODE"] = "true"
+    set_system_variable("DEBUG_MODE", True)
 
 
 def pytest_configure(config: Config) -> None:
@@ -375,6 +387,21 @@ def rewrite_expected(request: SubRequest) -> bool:
 @pytest.fixture(autouse=True)
 def mock_matplotlib(mocker):
     mocker.patch("matplotlib.pyplot.show")
+
+
+@pytest.fixture(autouse=True)
+def mock_plotly(mocker):
+    mocker.patch("plotly.io.show")
+
+
+# pylint: disable=protected-access
+@pytest.fixture(autouse=True)
+def mock_yfinance_tzcache(mocker):
+    mocker.patch.object(
+        target=yfinance.utils,
+        attribute="_TzCache",
+        new=yfinance.utils._TzCacheDummy,
+    )
 
 
 @pytest.fixture

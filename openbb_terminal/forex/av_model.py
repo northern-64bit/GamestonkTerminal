@@ -7,15 +7,14 @@ from typing import Any, Dict, List
 
 import pandas as pd
 
-from openbb_terminal import config_terminal as cfg
+from openbb_terminal.core.session.current_user import get_current_user
 from openbb_terminal.decorators import log_start_end
+from openbb_terminal.helper_funcs import get_user_timezone, request
 from openbb_terminal.rich_config import console
-from openbb_terminal.helper_funcs import request
 
 logger = logging.getLogger(__name__)
 
 
-@log_start_end(log=logger)
 def get_currency_list() -> List:
     """Load AV currency codes from a local file."""
     path = os.path.join(os.path.dirname(__file__), "data/av_forex_currencies.csv")
@@ -72,7 +71,7 @@ def get_quote(to_symbol: str = "USD", from_symbol: str = "EUR") -> Dict[str, Any
         "https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE"
         + f"&from_currency={from_symbol}"
         + f"&to_currency={to_symbol}"
-        + f"&apikey={cfg.API_KEY_ALPHAVANTAGE}"
+        + f"&apikey={get_current_user().credentials.API_KEY_ALPHAVANTAGE}"
     )
 
     response = request(url)
@@ -127,7 +126,7 @@ def get_historical(
     d_res = {"i": "FX_INTRADAY", "d": "FX_DAILY", "w": "FX_WEEKLY", "m": "FX_MONTHLY"}
 
     url = f"https://www.alphavantage.co/query?function={d_res[resolution]}&from_symbol={from_symbol}"
-    url += f"&to_symbol={to_symbol}&outputsize=full&apikey={cfg.API_KEY_ALPHAVANTAGE}"
+    url += f"&to_symbol={to_symbol}&outputsize=full&apikey={get_current_user().credentials.API_KEY_ALPHAVANTAGE}"
     if resolution == "i":
         url += f"&interval={interval}min"
 
@@ -156,12 +155,17 @@ def get_historical(
             key = list(response_json.keys())[1]
 
             df = pd.DataFrame.from_dict(response_json[key], orient="index")
+            df.index = pd.to_datetime(df.index)
 
             if start_date and resolution != "i":
                 df = df[df.index > start_date]
 
             if end_date and resolution != "i":
                 df = df[df.index < end_date]
+
+            if (df.index.hour != 0).any():
+                # if intraday data, convert to local timezone
+                df.index = df.index.tz_localize("UTC").tz_convert(get_user_timezone())
 
             df = df.rename(
                 columns={

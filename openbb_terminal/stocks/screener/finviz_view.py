@@ -4,19 +4,19 @@ __docformat__ = "numpy"
 import difflib
 import logging
 import os
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.helper_funcs import (
     export_data,
-    print_rich_table,
     lambda_long_number_format,
+    print_rich_table,
 )
-from openbb_terminal.terminal_helper import suppress_stdout
 from openbb_terminal.rich_config import console
 from openbb_terminal.stocks.screener.finviz_model import get_screener_data
+from openbb_terminal.terminal_helper import suppress_stdout
 
 logger = logging.getLogger(__name__)
 
@@ -127,11 +127,11 @@ d_cols_to_sort = {
 def screener(
     loaded_preset: str = "top_gainers",
     data_type: str = "overview",
-    limit: int = 10,
+    limit: int = -1,
     ascend: bool = False,
     sortby: str = "",
     export: str = "",
-    sheet_name: str = None,
+    sheet_name: Optional[str] = None,
 ) -> List[str]:
     """Screener one of the following: overview, valuation, financial, ownership, performance, technical.
 
@@ -159,7 +159,7 @@ def screener(
         df_screen = get_screener_data(
             preset_loaded=loaded_preset,
             data_type=data_type,
-            limit=10,
+            limit=limit,
             ascend=ascend,
         )
 
@@ -236,10 +236,12 @@ def screener(
             )
 
         print_rich_table(
-            df_screen.head(n=limit),
+            df_screen,
             headers=list(df_screen.columns),
             show_index=False,
             title="Finviz Screener",
+            export=bool(export),
+            limit=limit,
         )
 
         export_data(
@@ -250,9 +252,11 @@ def screener(
             sheet_name,
         )
 
-        return list(df_screen.head(n=limit)["Ticker"].values)
+        return df_screen.Ticker.tolist()
 
     console.print(
-        "The preset selected did not return a sufficient number of tickers. Two or more tickers are needed."
+        "Error: The preset selected did not return results."
+        "This might be a temporary error that is resolved by running the command again."
+        "If no results continue to be returned, check the preset and expand the parameters."
     )
     return []

@@ -1,9 +1,8 @@
     view               view available presets (defaults and customs)
     set                set one of the available presets
 
-Preset: top_gainers.ini
+Preset: top_gainers
 
-    historical         view historical price                                           [YahooFinance]
     overview           overview (e.g. Sector, Industry, Market Cap, Volume)            [Finviz]
     valuation          valuation (e.g. P/E, PEG, P/S, P/B, EPS this Y)                 [Finviz]
     financial          financial (e.g. Dividend, ROA, ROE, ROI, Earnings)              [Finviz]

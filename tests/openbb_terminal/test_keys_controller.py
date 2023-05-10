@@ -1,5 +1,17 @@
+# IMPORTATION STANDARD
+
+# IMPORTATION THIRDPARTY
 import pytest
 
+from openbb_terminal.core.models.user_model import (
+    CredentialsModel,
+    PreferencesModel,
+    ProfileModel,
+    SourcesModel,
+    UserModel,
+)
+
+# IMPORTATION INTERNAL
 from openbb_terminal.keys_controller import KeysController
 
 controller = KeysController(menu_usage=False)
@@ -8,8 +20,20 @@ controller = KeysController(menu_usage=False)
 
 
 @pytest.fixture(autouse=True)
-def no_change_env(mocker):
-    mocker.patch("openbb_terminal.keys_model.dotenv.set_key")
+def mock(mocker):
+    mocker.patch(
+        target="openbb_terminal.keys_model.set_credential",
+    )
+    mocker.patch("openbb_terminal.keys_model.write_to_dotenv")
+    mocker.patch(
+        target="openbb_terminal.keys_model.get_current_user",
+        return_value=UserModel(
+            profile=ProfileModel(),
+            credentials=CredentialsModel(),
+            preferences=PreferencesModel(),
+            sources=SourcesModel(),
+        ),
+    )
 
 
 class MockCFG:
@@ -24,14 +48,11 @@ class MockCFG:
         self.API_TRADIER_TOKEN = kwargs.get("TRADIER", None)
         self.API_CMC_KEY = kwargs.get("CMC", None)
         self.API_FINNHUB_KEY = kwargs.get("FINNHUB", None)
-        self.API_IEX_TOKEN = kwargs.get("IEX", None)
         self.API_REDDIT_CLIENT_ID = kwargs.get("REDDIT_CLIENT", None)
         self.API_REDDIT_CLIENT_SECRET = kwargs.get("REDDIT_SECRET", None)
         self.API_REDDIT_USERNAME = kwargs.get("REDDIT_USERNAME", None)
         self.API_REDDIT_PASSWORD = kwargs.get("REDDIT_PASSWORD", None)
         self.API_REDDIT_USER_AGENT = kwargs.get("REDDIT_USER", None)
-        self.API_TWITTER_KEY = kwargs.get("TWITTER", None)
-        self.API_TWITTER_SECRET_KEY = kwargs.get("TWITTER", None)
         self.API_TWITTER_BEARER_TOKEN = kwargs.get("TWITTER", None)
         self.RH_USERNAME = kwargs.get("RH", None)
         self.RH_PASSWORD = kwargs.get("RH", None)
@@ -43,7 +64,6 @@ class MockCFG:
         self.API_BINANCE_KEY = kwargs.get("BINANCE", None)
         self.API_BINANCE_SECRET = kwargs.get("BINANCE", None)
         self.API_BITQUERY_KEY = kwargs.get("BITQUERY", None)
-        self.API_SENTIMENTINVESTOR_TOKEN = kwargs.get("SI", None)
         self.API_COINBASE_KEY = kwargs.get("COINBASE", None)
         self.API_COINBASE_SECRET = kwargs.get("COINBASE", None)
         self.API_COINBASE_PASS_PHRASE = kwargs.get("COINBASE", None)
@@ -121,12 +141,6 @@ def test_call_finnhub(other):
 
 
 @pytest.mark.vcr
-@pytest.mark.parametrize("other", [[], ["-k", "1234"], ["1234"]])
-def test_call_iex(other):
-    controller.call_iex(other)
-
-
-@pytest.mark.vcr
 @pytest.mark.parametrize(
     "other", [[], ["-i", "1234", "-s", "4", "-u", "5", "-p", "6", "-a", "7"]]
 )
@@ -168,12 +182,6 @@ def test_call_binance(other):
 @pytest.mark.parametrize("other", [[], ["-k", "1234"], ["1234"]])
 def test_call_bitquery(other):
     controller.call_bitquery(other)
-
-
-@pytest.mark.vcr
-@pytest.mark.parametrize("other", [[], ["-k", "1234"], ["1234"]])
-def test_call_si(other):
-    controller.call_si(other)
 
 
 @pytest.mark.vcr

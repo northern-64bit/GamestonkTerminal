@@ -3,7 +3,6 @@ name: Windows10 Build
 env:
   OPENBB_ENABLE_QUICK_EXIT: true
   OPENBB_LOG_COLLECT: false
-  OPENBB_USE_ION: false
   OPENBB_USE_PROMPT_TOOLKIT: false
   PIP_DEFAULT_TIMEOUT: 100
   PYTHONNOUSERSITE: 1
@@ -17,7 +16,7 @@ concurrency:
 jobs:
   Windows-Build:
     name: Windows10 Build ENV
-    runs-on: windows-latest
+    runs-on: windows-2019
     # Configuring -------------
     steps:
       - name: Setup Windows Git Configuration # This is under the assumption that git is already installed on the system
@@ -26,7 +25,7 @@ jobs:
           git config --system core.longpaths true
 
       - name: Checkout
-        uses: actions/checkout@v2.4.2
+        uses: actions/checkout@v3
 
       - name: Set up Python & Create OpenBB Environment
         uses: actions/setup-python@v4
@@ -35,24 +34,27 @@ jobs:
 
       - name: Create and start virtual environment
         run: |
-          python -m venv venv
+          python -m venv venv --upgrade-deps
           source venv/Scripts/activate
-          python -m pip install --upgrade pip
-          python -m pip install poetry==1.1.13
           python -m pip install setuptools==64.0.2 wheel
-          python -m pip install charset_normalizer==2.1.1
-          python -m poetry install -E installer -E all
+          python -m pip install -r requirements-full.txt
           python -m pip uninstall papermill -y
           python -m pip install git+https://github.com/nteract/papermill.git@main
           python -m PyInstaller build/pyinstaller/terminal.spec --clean
-
+          pwd
         shell: bash
+
+      - name: zip the file
+        run: |
+          Get-Location
+          Compress-Archive dist release.zip
+        shell: pwsh
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: OpenBB-Windows10-ENV
-          path: dist
+          path: release.zip
 
 
   Build-Exe:
@@ -67,13 +69,17 @@ jobs:
           git config --system core.longpaths true
 
       - name: Checkout
-        uses: actions/checkout@v2.4.2
+        uses: actions/checkout@v3
 
       - name: Download Artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: OpenBB-Windows10-ENV
-          path: dist
+          path: .
+
+      - name: unzip artifact for deployment
+        run: Expand-Archive release.zip -DestinationPath .
+        shell: pwsh
 
       - name: Move Files into App Folder
         run: cp -r .\dist\OpenBBTerminal\ .\build\nsis\app\
@@ -84,6 +90,12 @@ jobs:
         run: |
           C:\'.\Program Files (x86)\'\nsis\makensis.exe .\build\nsis\setup.nsi
 
+      # This should autosign the installer now - We really need to only do this when needed though. ON RELEASE
+      - name: Sign Installer
+        if: startsWith(github.ref, 'refs/heads/main')
+        run: |
+          & 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x86\signtool.exe' sign /fd sha256 /tr http://ts.ssl.com /td sha256 /sha1 26a8e28dbe3b1db7407b92d7de97c290d4436a32 'C:\Users\Administrator\actions-runner\_work\OpenBBTerminal\OpenBBTerminal\build\nsis\OpenBB Terminal Setup.exe'
+
       - name: Save Build Artifact
         uses: actions/upload-artifact@v3
         with:
@@ -92,7 +104,23 @@ jobs:
 
       - name: Run Integration Tests
         run: |
-          dist\OpenBBTerminal\OpenBBTerminal.exe -t
+          dist\OpenBBTerminal\OpenBBTerminal.exe -t -s forecast cryptocurrency reports alternative economy futures econometrics dashboards portfolio stocks/test_stocks_options_screen.openbb stocks/test_stocks_options.openbb forex etf stocks/test_stocks_fa.openbb | tee result.txt
+          Select-String "================================ Integration Test Summary ================================" result.txt -Context 0,100 | Select-Object -Last 2000 | Out-File summary.txt
+          Write-output `n >> summary.txt
+
+      - name: Run Integration Tests Coverage Report
+        run: |
+          dist\OpenBBTerminal\OpenBBTerminal.exe -t --coverage | tee result.txt
+          Select-String "============================== Integration Coverage Summary ==============================" result.txt -Context 0,300 | Select-Object -Last 2000 >> summary.txt
+
+      - name: Upload summary to Slack
+        uses: adrey/slack-file-upload-action@master
+        with:
+          token: ${{ secrets.SLACK_API_TOKEN }}
+          initial_comment: "Windows Build Integration test summary"
+          title: "Windows Build Integration test summary"
+          path: summary.txt
+          channel: ${{ secrets.SLACK_CHANNEL_ID }}
 
       # Cleaning ------------------------
       # Make sure to add Remove-Item C:\Users\Administrator\Desktop\OPENBB-exports -Recurse whenever integration tests get fixed

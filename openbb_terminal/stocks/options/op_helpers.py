@@ -1,18 +1,18 @@
 """Option helper functions"""
 __docformat__ = "numpy"
 
-from datetime import datetime, timedelta
 import logging
+from datetime import datetime, timedelta
 from math import e, log
-from typing import Union, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
-from openbb_terminal.rich_config import console
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.helper_funcs import get_rf
+from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +22,13 @@ logger = logging.getLogger(__name__)
 def get_strikes(
     min_sp: float, max_sp: float, current_price: float
 ) -> Tuple[float, float]:
-    if min_sp == -1:
-        min_strike = 0.75 * current_price
-    else:
-        min_strike = min_sp
+    min_strike = 0.75 * current_price if min_sp == -1 else min_sp
 
-    if max_sp == -1:
-        max_strike = 1.25 * current_price
-    else:
-        max_strike = max_sp
+    max_strike = 1.25 * current_price if max_sp == -1 else max_sp
 
     return min_strike, max_strike
 
 
-@log_start_end(log=logger)
 def get_loss_at_strike(strike: float, chain: pd.DataFrame) -> float:
     """Function to get the loss at the given expiry
 
@@ -64,7 +57,6 @@ def get_loss_at_strike(strike: float, chain: pd.DataFrame) -> float:
     return loss
 
 
-@log_start_end(log=logger)
 def calculate_max_pain(chain: pd.DataFrame) -> Union[int, float]:
     """Returns the max pain for a given call/put dataframe
 
@@ -91,7 +83,6 @@ def calculate_max_pain(chain: pd.DataFrame) -> Union[int, float]:
     return max_pain
 
 
-@log_start_end(log=logger)
 def convert(orig: str, to: str) -> float:
     """Convert a string to a specific type of number
     Parameters
@@ -111,7 +102,6 @@ def convert(orig: str, to: str) -> float:
     raise ValueError("Invalid to format, please use '%' or ','.")
 
 
-@log_start_end(log=logger)
 def rn_payoff(x: str, df: pd.DataFrame, put: bool, delta: int, rf: float) -> float:
     """The risk neutral payoff for a stock
     Parameters
@@ -180,6 +170,9 @@ def process_option_chain(data: pd.DataFrame, source: str) -> pd.DataFrame:
 
         df = pd.concat([calls, puts]).drop_duplicates()
 
+    elif source == "Intrinio":
+        df = data.copy()
+
     elif source == "YahooFinance":
         call_columns = ["expiration", "strike"] + [
             col for col in data.columns if col.endswith("_c")
@@ -212,7 +205,7 @@ def get_greeks(
     puts: pd.DataFrame,
     expire: str,
     div_cont: float = 0,
-    rf: float = None,
+    rf: Optional[float] = None,
     opt_type: int = 0,
     show_all: bool = False,
     show_extra_greeks: bool = False,
@@ -257,10 +250,11 @@ def get_greeks(
     if not all(
         col in chain_columns for col in ["strike", "impliedVolatility", "optionType"]
     ):
-        console.print(
-            "[red]It's not possible to calculate the greeks without the following "
-            "columns: `strike`, `impliedVolatility`, `optionType`.\n[/red]"
-        )
+        if "delta" not in chain_columns:
+            console.print(
+                "[red]It's not possible to calculate the greeks without the following "
+                "columns: `strike`, `impliedVolatility`, `optionType`.\n[/red]"
+            )
         return pd.DataFrame()
 
     risk_free = rf if rf is not None else get_rf()
@@ -271,31 +265,37 @@ def get_greeks(
     strikes = []
     for _, row in chain.iterrows():
         vol = row["impliedVolatility"]
-        opt_type = 1 if row["optionType"] == "call" else -1
-        opt = Option(
-            current_price, row["strike"], risk_free, div_cont, dif, vol, opt_type
-        )
-        tmp = [
-            opt.Delta(),
-            opt.Gamma(),
-            opt.Vega(),
-            opt.Theta(),
-        ]
+        is_call = row["optionType"] == "call"
         result = (
             [row[col] for col in row.index.tolist()]
             if show_all
             else [row[col] for col in ["strike", "impliedVolatility"]]
         )
-        result += tmp
-
-        if show_extra_greeks:
-            result += [
-                opt.Rho(),
-                opt.Phi(),
-                opt.Charm(),
-                opt.Vanna(0.01),
-                opt.Vomma(0.01),
+        try:
+            opt = Option(
+                current_price, row["strike"], risk_free, div_cont, dif, vol, is_call
+            )
+            tmp = [
+                opt.Delta(),
+                opt.Gamma(),
+                opt.Vega(),
+                opt.Theta(),
             ]
+            result += tmp
+
+            if show_extra_greeks:
+                result += [
+                    opt.Rho(),
+                    opt.Phi(),
+                    opt.Charm(),
+                    opt.Vanna(0.01),
+                    opt.Vomma(0.01),
+                ]
+        except ValueError:
+            result += [np.nan] * 4
+
+            if show_extra_greeks:
+                result += [np.nan] * 5
         strikes.append(result)
 
     greek_columns = [
@@ -304,13 +304,11 @@ def get_greeks(
         "Vega",
         "Theta",
     ]
-    if show_all:
-        columns = chain_columns + greek_columns
-    else:
-        columns = [
-            "Strike",
-            "Implied Vol",
-        ] + greek_columns
+    columns = (
+        chain_columns + greek_columns
+        if show_all
+        else ["Strike", "Implied Vol"] + greek_columns
+    )
 
     if show_extra_greeks:
         additional_columns = ["Rho", "Phi", "Charm", "Vanna", "Vomma"]
@@ -396,7 +394,7 @@ class Option:
         div_cont: float,
         expiry: float,
         vol: float,
-        opt_type: int = 1,
+        is_call: bool = True,
     ):
         """
         Class for getting the greeks of options. Inspiration from:
@@ -416,10 +414,18 @@ class Option:
             The number of days until expiration
         vol : float
             The underlying volatility for an option
-        opt_type : int
-            put == -1; call == +1
+        is_call : bool
+            True if call, False if put
         """
-        self.Type = int(opt_type)
+        if expiry <= 0:
+            raise ValueError("Expiry must be greater than 0")
+        if vol <= 0:
+            raise ValueError("Volatility must be greater than 0")
+        if s <= 0:
+            raise ValueError("Price must be greater than 0")
+        if k <= 0:
+            raise ValueError("Strike must be greater than 0")
+        self.Type = 1 if is_call else -1
         self.price = float(s)
         self.strike = float(k)
         self.risk_free = float(rf)
@@ -585,3 +591,19 @@ class Option:
             * norm.pdf(self.d1)
             / self._sigma
         )
+
+
+def get_dte(chain: pd.DataFrame) -> pd.DataFrame:
+    """
+    Returns a new column containing the DTE as an integer, including 0.
+    Requires the chain to have the column labeled as, expiration.
+    """
+    if "expiration" not in chain.columns:
+        raise ValueError("No column labeled 'expiration' was found.")
+
+    now = datetime.now()
+    temp = pd.DatetimeIndex(chain.expiration)
+    temp_ = (temp - now).days + 1
+    chain["dte"] = temp_
+
+    return chain

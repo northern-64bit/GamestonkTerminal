@@ -1,19 +1,19 @@
 """Yahoo Finance model"""
 __docformat__ = "numpy"
 
+import logging
 import os
 import sys
-import logging
-from typing import List, Optional
 from datetime import datetime, timedelta
+from typing import List, Optional
 
-import yfinance as yf
 import pandas as pd
+import yfinance as yf
 from dateutil.relativedelta import relativedelta
 
-from openbb_terminal.rich_config import console
-from openbb_terminal.decorators import log_start_end
 from openbb_terminal.core.config.paths import MISCELLANEOUS_DIRECTORY
+from openbb_terminal.decorators import log_start_end
+from openbb_terminal.rich_config import console
 
 # pylint: disable=attribute-defined-outside-init
 
@@ -40,7 +40,7 @@ MONTHS = {
 class HiddenPrints:
     def __enter__(self):
         self._original_stdout = sys.stdout
-        sys.stdout = open(os.devnull, "w")
+        sys.stdout = open(os.devnull, "w")  # noqa: SIM115
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         sys.stdout.close()
@@ -99,7 +99,7 @@ def get_historical_futures(
     Returns
     -------
     pd.DataFrame
-        Dictionary with sector weightings allocation
+        Historical futures data
     """
 
     if start_date is None:
@@ -184,12 +184,10 @@ def get_curve_futures(
             data = yf.download(future_symbol, progress=False, ignore_tz=True)
 
         if not data.empty:
-            futures_index.append(future.strftime("%Y-%b"))
+            futures_index.append(future.strftime("%b-%Y"))
             futures_curve.append(data["Adj Close"].values[-1])
 
     if not futures_index:
         return pd.DataFrame()
 
-    futures_index = pd.to_datetime(futures_index)
-
-    return pd.DataFrame(index=futures_index, data=futures_curve, columns=["Futures"])
+    return pd.DataFrame(index=futures_index, data=futures_curve, columns=["Last Price"])
